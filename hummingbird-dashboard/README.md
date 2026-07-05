@@ -140,14 +140,14 @@ router.add(middleware: DashboardMiddleware(metrics: metrics))
 
 ```
   Browser                         Your Hummingbird app
-  ───────                         ────────────────────
+  -----                           --------------------
 
-  GET /dashboard        ────────► Dashboard routes (HTML, JSON, Prometheus)
-  WS  /dashboard/api/live  ─────► Optional WebSocket push (HummingbirdDashboardWS)
+  GET /dashboard                  --> Dashboard routes (HTML, JSON, Prometheus)
+  WS  /dashboard/api/live         --> Optional WebSocket push (HummingbirdDashboardWS)
 
-  GET /hello            ────────► DashboardMiddleware
-  GET /api/users/{id}   ────────► records timing, status, bytes, route template
-                          ────────► DashboardMetrics (thread-safe, in-memory)
+  GET /hello                      --> DashboardMiddleware
+  GET /api/users/{id}             --> records timing, status, bytes, route template
+                                  --> DashboardMetrics (thread-safe, in-memory)
 ```
 
 **`DashboardMiddleware`** wraps your handlers and records each completed request: method, status, duration, bytes in/out, and the route template from `context.endpointPath` (so `/api/users/1` and `/api/users/2` aggregate as `/api/users/{id}`).
