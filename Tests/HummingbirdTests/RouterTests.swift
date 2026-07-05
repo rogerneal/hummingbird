@@ -644,6 +644,9 @@ struct RouterTests {
         router.group("group").get("Uppercased") { _, _ in
             HTTPResponse.Status.ok
         }
+        router.get("recorded/:file") { _, context in
+            try context.parameters.require("file", as: String.self)
+        }
         let app = Application(responder: router.buildResponder())
         try await app.test(.router) { client in
             try await client.execute(uri: "/uppercased", method: .get) { response in
@@ -654,6 +657,10 @@ struct RouterTests {
             }
             try await client.execute(uri: "/Group/uppercased", method: .get) { response in
                 #expect(response.status == .ok)
+            }
+            try await client.execute(uri: "/RECORDED/MyFile.mp4", method: .get) { response in
+                #expect(response.status == .ok)
+                #expect(String(buffer: response.body) == "MyFile.mp4")
             }
         }
     }

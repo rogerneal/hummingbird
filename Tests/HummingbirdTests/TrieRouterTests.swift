@@ -185,4 +185,12 @@ struct TrieRouterTests {
         #expect(trie.resolve("this.txt")?.value == "prefixWildcard")
         #expect(trie.resolve("hello")?.value == "parameter")
     }
+
+    @Test func testCaseInsensitivePreservesParameterCase() {
+        let trieBuilder = RouterPathTrieBuilder<String>()
+        trieBuilder.addEntry("recorded/{file}", value: "recorded")
+        let trie = trieBuilder.build()
+        #expect(trie.resolve("/RECORDED/MyFile.mp4", caseInsensitive: true)?.value == "recorded")
+        #expect(trie.resolve("/RECORDED/MyFile.mp4", caseInsensitive: true)?.parameters.get("file") == "MyFile.mp4")
+    }
 }
