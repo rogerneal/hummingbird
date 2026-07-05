@@ -1,79 +1,38 @@
 # Hummingbird Dashboard
 
-A lightweight, zero-configuration observability dashboard for [Hummingbird](https://github.com/hummingbird-project/hummingbird) servers.
+A drop-in observability dashboard for [Hummingbird](https://github.com/hummingbird-project/hummingbird) servers.
 
-Add one middleware and a few routes, then open `/dashboard` in your browser to see live request metrics — no Redis, no sidecar, no external services.
+Add middleware and a few routes to your app, then open `/dashboard` in a browser to watch request traffic, latency, and errors in real time. Metrics stay inside your process — no Redis, sidecar, or separate dashboard service required.
 
-![Hummingbird Dashboard UI](docs/dashboard-screenshot.png)
+![Hummingbird Dashboard UI](dashboard-screenshot.png)
 
-## What it does
+## What you get
 
-Hummingbird Dashboard gives you **in-process observability** for any Hummingbird app:
+Once wired up, your Hummingbird app serves:
 
-| Feature | Description |
-|---|---|
-| **Live dashboard UI** | Dark-themed web page with charts, route stats, and a recent-requests feed |
-| **Request metrics** | Total requests, RPS (60s history), in-flight count, error rate |
-| **Latency tracking** | p50 / p90 / p99 percentiles from the last 1,000 completed requests |
-| **Per-route breakdown** | Requests, average/max duration, error rate, and last status — grouped by route template (e.g. `/api/users/{id}`) |
-| **Recent requests** | Rolling feed of the latest completed requests |
-| **JSON API** | Machine-readable metrics snapshot for custom tooling |
-| **Prometheus export** | Standard `/metrics` endpoint for scraping with Prometheus or Grafana |
-| **WebSocket push** | Optional live updates via [hummingbird-websocket](https://github.com/hummingbird-project/hummingbird-websocket), with automatic polling fallback |
+- **`/dashboard`** — a web UI with request rate charts, latency percentiles, status/method breakdowns, per-route statistics, and a recent-requests feed
+- **`/dashboard/api/metrics`** — the same data as JSON for scripts or custom tooling
+- **`/metrics`** — Prometheus exposition format for scraping with Prometheus or Grafana
+- **`/dashboard/api/live`** *(optional)* — a WebSocket stream that pushes metric snapshots to the UI
 
-Everything is stored **in memory** inside your process. Metrics reset when the server restarts. For long-term retention, scrape the Prometheus endpoint.
+The UI updates over WebSocket when available (**live · ws** in the header), and falls back to polling the JSON API every two seconds if the socket is unavailable.
 
-## How it works
+Metrics are collected in memory inside your server process. They reset on restart; use the Prometheus endpoint if you need history beyond the current process lifetime.
 
-```
-  Browser                    Your Hummingbird app
-  ───────                    ────────────────────
+## Getting started
 
-  GET /dashboard  ────────►  Dashboard routes serve HTML + JSON API
-  WS  /dashboard/api/live ─►  (optional) WebSocket pushes metric snapshots
+1. Add `HummingbirdDashboard` (and optionally `HummingbirdDashboardWS`) to your `Package.swift`
+2. Register dashboard routes on your router
+3. Add `DashboardMiddleware()` so incoming requests are recorded
+4. Run the app and open `/dashboard`
 
-  GET /hello      ────────►  DashboardMiddleware records the request
-  GET /api/users  ────────►  → timing, status, bytes, route template
-                             → stored in DashboardMetrics (thread-safe)
-```
-
-1. **`DashboardMiddleware`** wraps your handlers. For each request it records start time, in-flight count, method, path, response status, duration, and bytes transferred. It uses the route **template** (from `context.endpointPath`) so `/api/users/1` and `/api/users/2` group together as `/api/users/{id}`.
-
-2. **`DashboardMetrics`** holds all counters and samples in a thread-safe store (`NIOLockedValueBox`). Latency uses a rolling sample window; RPS uses a 60-second ring buffer.
-
-3. **Dashboard routes** read from the same metrics store and expose:
-   - HTML page (JavaScript updates the DOM)
-   - JSON snapshot at `/dashboard/api/metrics`
-   - Prometheus text at `/metrics`
-   - Optional WebSocket stream at `/dashboard/api/live`
-
-4. **The dashboard page** connects to the WebSocket when available and shows **live · ws** in the header. If the WebSocket fails, it falls back to polling the JSON API every 2 seconds.
-
-### Important: register routes before middleware
-
-Dashboard routes should be registered **before** `DashboardMiddleware()` so the dashboard's own traffic is not counted in the metrics it displays:
+Register dashboard routes **before** the middleware so the dashboard's own traffic is not counted in the metrics it displays:
 
 ```swift
-router.addDashboard()                    // ← first
-router.add(middleware: DashboardMiddleware())  // ← then middleware
-// ... your app routes ...
+router.addDashboard()                         // first
+router.add(middleware: DashboardMiddleware()) // then middleware
+// ... your routes ...
 ```
-
-## Products
-
-| Product | When to use |
-|---|---|
-| **`HummingbirdDashboard`** | Core library: middleware, metrics store, HTML UI, JSON API, Prometheus. Depends only on Hummingbird. |
-| **`HummingbirdDashboardWS`** | Adds WebSocket live push. Depends on `HummingbirdDashboard` + `HummingbirdWebSocket`. |
-
-## Requirements
-
-- Swift 6.1+
-- Hummingbird 2.x
-- **Apple:** macOS 14+ / iOS 17+ / tvOS 17+ (minimum deployment targets in `Package.swift`)
-- **Linux:** supported — Swift Package Manager builds on Linux by default; no Apple-only APIs are used in the core library
-
-## Quick start
 
 ### Try the demo
 
@@ -82,15 +41,17 @@ cd hummingbird-dashboard
 swift run DashboardExample
 ```
 
-Open [http://localhost:8080/dashboard](http://localhost:8080/dashboard). The example includes a built-in traffic simulator so metrics appear immediately.
+Open [http://localhost:8080/dashboard](http://localhost:8080/dashboard). The example runs a built-in traffic simulator so metrics appear immediately.
 
-Use a different port if 8080 is taken:
+If port 8080 is in use:
 
 ```sh
 SERVER_PORT=8099 swift run DashboardExample
 ```
 
-### Add to your app (polling only)
+### Polling only
+
+Depends on Hummingbird only. The UI polls `/dashboard/api/metrics` on a timer.
 
 ```swift
 import Hummingbird
@@ -105,7 +66,9 @@ let app = Application(router: router)
 try await app.runService()
 ```
 
-### Add to your app (WebSocket live updates)
+### WebSocket live updates
+
+Adds push updates via [hummingbird-websocket](https://github.com/hummingbird-project/hummingbird-websocket). Requires a WebSocket-capable router context and server configuration.
 
 ```swift
 import Hummingbird
@@ -124,6 +87,21 @@ let app = Application(
 )
 try await app.runService()
 ```
+
+## When to use it
+
+- **Local development** — see which routes are slow, failing, or getting unexpected traffic
+- **Demos and staging** — give teammates or stakeholders a live view without standing up Grafana
+- **Small services** — enough visibility for day-to-day operations without a full observability stack
+
+For production alerting and long-term retention, scrape `/metrics` into Prometheus or Grafana alongside (or instead of) using the built-in UI.
+
+## Products
+
+| Product | Description |
+|---|---|
+| **`HummingbirdDashboard`** | Metrics middleware, in-memory store, HTML UI, JSON API, and Prometheus export. Depends on Hummingbird only. |
+| **`HummingbirdDashboardWS`** | Everything above plus a WebSocket endpoint for live push updates. Depends on `HummingbirdDashboard` and `HummingbirdWebSocket`. |
 
 ## Endpoints
 
@@ -144,19 +122,46 @@ All paths are configurable via `DashboardConfiguration`.
 router.addDashboard(configuration: .init(
     path: "/dashboard",              // dashboard HTML + API base path
     prometheusPath: "/metrics",      // set to nil to disable Prometheus
-    enableReset: false,              // true adds POST /dashboard/api/reset
+    enableReset: false,              // true adds POST /dashboard/api/reset + UI button
     refreshIntervalMS: 2000,         // poll / push interval for the UI
     liveSocketPath: nil              // set automatically by addDashboardWithLiveUpdates()
 ))
 ```
 
-Pass the same `DashboardMetrics` instance to both the middleware and routes if you use a custom store instead of `.shared`:
+Use a shared metrics instance when you need a custom store instead of `.shared`:
 
 ```swift
 let metrics = DashboardMetrics()
 router.addDashboard(metrics: metrics)
 router.add(middleware: DashboardMiddleware(metrics: metrics))
 ```
+
+## How it works
+
+```
+  Browser                         Your Hummingbird app
+  ───────                         ────────────────────
+
+  GET /dashboard        ────────► Dashboard routes (HTML, JSON, Prometheus)
+  WS  /dashboard/api/live ─────► Optional WebSocket push (HummingbirdDashboardWS)
+
+  GET /hello            ────────► DashboardMiddleware
+  GET /api/users/{id}   ────────► records timing, status, bytes, route template
+                                  → DashboardMetrics (thread-safe, in-memory)
+```
+
+**`DashboardMiddleware`** wraps your handlers and records each completed request: method, status, duration, bytes in/out, and the route template from `context.endpointPath` (so `/api/users/1` and `/api/users/2` aggregate as `/api/users/{id}`).
+
+**`DashboardMetrics`** stores counters, a 60-second RPS history, latency samples (last 1,000 requests for percentile calculation), per-route stats (up to 200 routes), and a rolling recent-requests feed.
+
+**Dashboard routes** read from the same metrics store the middleware writes to and expose the HTML page, JSON snapshot, Prometheus text, and optional WebSocket stream.
+
+## Requirements
+
+- Swift 6.1+
+- Hummingbird 2.x
+- **Apple:** macOS 14+ / iOS 17+ / tvOS 17+ (minimum deployment targets in `Package.swift`)
+- **Linux:** supported — Swift Package Manager builds on Linux by default; the core library uses no Apple-only APIs
 
 ## Local development (this fork)
 
@@ -175,13 +180,13 @@ cd hummingbird-dashboard
 swift test
 ```
 
-The test suite covers metrics recording, route template grouping, Prometheus export, end-to-end HTTP, and WebSocket live streaming.
+Covers metrics recording, route template grouping, Prometheus export, end-to-end HTTP, WebSocket streaming, and reset UI behavior.
 
-## Security notes
+## Production use
 
-- The dashboard exposes operational data (routes, error rates, recent requests). In production, protect it with an auth middleware or bind it to an internal-only interface.
-- `enableReset` registers an unauthenticated endpoint that wipes all metrics. Leave it disabled (the default) outside development.
-- Metrics are in-memory only. Use the Prometheus endpoint with Grafana for persistence and alerting.
+- Protect `/dashboard` with auth middleware or serve it on an internal-only interface — it exposes routes, error rates, and recent requests.
+- Leave `enableReset` disabled (the default) outside development; it registers an unauthenticated endpoint that clears all metrics.
+- Scrape `/metrics` with Prometheus for persistence and alerting across restarts and replicas.
 
 ## License
 
