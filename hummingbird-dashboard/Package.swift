@@ -5,6 +5,7 @@ import PackageDescription
 
 let package = Package(
     name: "hummingbird-dashboard",
+    // Apple platform minimums; Linux is also supported (SwiftPM builds on Linux by default).
     platforms: [.macOS(.v14), .iOS(.v17), .tvOS(.v17)],
     products: [
         .library(name: "HummingbirdDashboard", targets: ["HummingbirdDashboard"]),

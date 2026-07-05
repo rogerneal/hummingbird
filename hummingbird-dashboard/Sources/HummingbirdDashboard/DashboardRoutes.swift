@@ -73,7 +73,8 @@ extension RouterMethods {
         let renderer = DashboardRenderer(
             metricsAPIPath: "\(apiPath)/metrics",
             refreshIntervalMS: configuration.refreshIntervalMS,
-            liveSocketPath: configuration.liveSocketPath
+            liveSocketPath: configuration.liveSocketPath,
+            resetAPIPath: configuration.enableReset ? "\(apiPath)/reset" : nil
         )
         let jsonEncoder = JSONEncoder()
 

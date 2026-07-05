@@ -69,8 +69,9 @@ router.add(middleware: DashboardMiddleware())  // ← then middleware
 ## Requirements
 
 - Swift 6.1+
-- macOS 14+ / iOS 17+ / tvOS 17+ (as declared in `Package.swift`)
 - Hummingbird 2.x
+- **Apple:** macOS 14+ / iOS 17+ / tvOS 17+ (minimum deployment targets in `Package.swift`)
+- **Linux:** supported — Swift Package Manager builds on Linux by default; no Apple-only APIs are used in the core library
 
 ## Quick start
 
@@ -134,7 +135,7 @@ All paths are configurable via `DashboardConfiguration`.
 | `GET /dashboard/api/metrics` | Full metrics snapshot as JSON |
 | `GET /dashboard/api/health` | Lightweight health check |
 | `GET /dashboard/api/live` | WebSocket live metrics stream (`HummingbirdDashboardWS` only) |
-| `POST /dashboard/api/reset` | Reset all metrics (opt-in, development only) |
+| `POST /dashboard/api/reset` | Reset all metrics (opt-in via `enableReset`; shows a **Reset** button in the UI) |
 | `GET /metrics` | Prometheus exposition format |
 
 ## Configuration
@@ -184,4 +185,4 @@ The test suite covers metrics recording, route template grouping, Prometheus exp
 
 ## License
 
-Apache-2.0, same as [Hummingbird](https://github.com/hummingbird-project/hummingbird).
+Apache-2.0 — see [LICENSE.txt](LICENSE.txt), same as [Hummingbird](https://github.com/hummingbird-project/hummingbird).

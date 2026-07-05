@@ -116,6 +116,8 @@ struct DashboardTests {
             try await client.execute(uri: "/dashboard", method: .get) { response in
                 #expect(response.status == .ok)
                 #expect(String(buffer: response.body).contains("Hummingbird Dashboard"))
+                #expect(String(buffer: response.body).contains("id=\"reset-btn\""))
+                #expect(String(buffer: response.body).contains("/dashboard/api/reset"))
             }
             try await client.execute(uri: "/dashboard/api/metrics", method: .get) { response in
                 let snapshot = try JSONDecoder().decode(DashboardSnapshot.self, from: Data(buffer: response.body))
@@ -152,6 +154,18 @@ struct DashboardTests {
         let route = try #require(snapshot.routes.first { $0.path.contains("users") })
         #expect(route.requests == 3)
         #expect(snapshot.routes.count == 1)
+    }
+
+    @Test func testDashboardHTMLExcludesResetWhenDisabled() async throws {
+        let router = Router()
+        router.addDashboard(configuration: .init(enableReset: false))
+        let app = Application(router: router)
+        try await app.test(.router) { client in
+            try await client.execute(uri: "/dashboard", method: .get) { response in
+                let html = String(buffer: response.body)
+                #expect(!html.contains("id=\"reset-btn\""))
+            }
+        }
     }
 
     @Test func testDashboardHTMLIncludesWebSocketPath() async throws {

@@ -17,11 +17,19 @@ struct DashboardRenderer: Sendable {
     let refreshIntervalMS: Int
     /// Optional WebSocket path for push updates; polling is the fallback
     let liveSocketPath: String?
+    /// When set, the dashboard shows a reset button that POSTs to this path
+    let resetAPIPath: String?
 
-    init(metricsAPIPath: String, refreshIntervalMS: Int = 2000, liveSocketPath: String? = nil) {
+    init(
+        metricsAPIPath: String,
+        refreshIntervalMS: Int = 2000,
+        liveSocketPath: String? = nil,
+        resetAPIPath: String? = nil
+    ) {
         self.metricsAPIPath = metricsAPIPath
         self.refreshIntervalMS = refreshIntervalMS
         self.liveSocketPath = liveSocketPath
+        self.resetAPIPath = resetAPIPath
     }
 
     func html() -> String {
@@ -46,6 +54,7 @@ struct DashboardRenderer: Sendable {
                 </div>
                 <div class="header-right">
                     <span class="live"><span class="dot" id="live-dot"></span><span id="live-label">live</span></span>
+                    \(self.resetAPIPath != nil ? #"<button type="button" class="btn-reset" id="reset-btn" title="Reset all metrics (development only)">Reset</button>"# : "")
                     <span>uptime <strong id="uptime">&ndash;</strong></span>
                     <span>in-flight <strong id="inflight-header">0</strong></span>
                 </div>
@@ -108,6 +117,7 @@ struct DashboardRenderer: Sendable {
         const API_PATH = "\(self.metricsAPIPath)";
         const REFRESH_MS = \(self.refreshIntervalMS);
         const LIVE_WS_PATH = \(self.liveSocketPath.map { "\"\($0)\"" } ?? "null");
+        const RESET_PATH = \(self.resetAPIPath.map { "\"\($0)\"" } ?? "null");
         \(Self.javascript)
         </script>
         </body>
@@ -145,6 +155,12 @@ struct DashboardRenderer: Sendable {
         .dot.on { background: #f97316; box-shadow: 0 0 6px #f97316; animation: pulse 1.6s infinite; }
         .dot.stale { background: #ef4444; }
         @keyframes pulse { 50% { opacity: 0.5; } }
+        .btn-reset {
+            padding: 4px 10px; border-radius: 6px; border: 1px solid #4a3728; background: #2a1f16;
+            color: #d8c9bc; font-size: 12px; font-weight: 600; cursor: pointer;
+        }
+        .btn-reset:hover { border-color: #f97316; color: #f5ede4; }
+        .btn-reset:disabled { opacity: 0.5; cursor: not-allowed; }
 
         .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 20px; }
         .card { background: #201710; border: 1px solid #33261c; border-radius: 10px; padding: 14px 16px; }
@@ -395,5 +411,22 @@ struct DashboardRenderer: Sendable {
 
         startPolling();
         if (LIVE_WS_PATH) connectWebSocket();
+
+        if (RESET_PATH) {
+            $("reset-btn").addEventListener("click", async () => {
+                if (!confirm("Reset all metrics? This cannot be undone.")) return;
+                const btn = $("reset-btn");
+                btn.disabled = true;
+                try {
+                    const response = await fetch(RESET_PATH, { method: "POST" });
+                    if (!response.ok) throw new Error("HTTP " + response.status);
+                    if (pollTimer !== null) await poll();
+                } catch (e) {
+                    alert("Failed to reset metrics.");
+                } finally {
+                    btn.disabled = false;
+                }
+            });
+        }
         """
 }
