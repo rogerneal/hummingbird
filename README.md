@@ -67,6 +67,10 @@ The following extensions are available in separate repositories:
 - [Jobs](https://github.com/hummingbird-project/swift-jobs): Job Queue Framework
 - [Mustache](https://github.com/hummingbird-project/swift-mustache): Mustache templating engine
 
+#### Work in progress (this fork)
+
+- [HummingbirdDashboard](./hummingbird-dashboard): Real-time observability dashboard with WebSocket live updates — see the [README](./hummingbird-dashboard/README.md) and run `swift run DashboardExample` from that directory
+
 ## Documentation
 
 You can find reference documentation and user guides for Hummingbird [here](https://docs.hummingbird.codes/2.0/documentation/hummingbird/). The [hummingbird-examples](https://github.com/hummingbird-project/hummingbird-examples/tree/main) repository has a number of examples of different uses of the library.
