@@ -9,17 +9,15 @@
 internal import Foundation
 import NIOCore
 
+enum _RouterTrieResolveOptions {
+    @TaskLocal static var caseInsensitive: Bool = false
+}
+
 extension RouterTrie {
     /// Resolve a path to a `Value` if available
     @inlinable
     public func resolve(_ path: String) -> (value: Value, parameters: Parameters)? {
-        self._resolve(path, caseInsensitive: false)
-    }
-
-    /// Resolve a path to a `Value` if available
-    @inlinable
-    @_spi(Internal) public func resolve(_ path: String, caseInsensitive: Bool) -> (value: Value, parameters: Parameters)? {
-        self._resolve(path, caseInsensitive: caseInsensitive)
+        self._resolve(path, caseInsensitive: _RouterTrieResolveOptions.caseInsensitive)
     }
 
     @usableFromInline
