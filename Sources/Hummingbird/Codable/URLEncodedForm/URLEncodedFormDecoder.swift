@@ -662,7 +662,7 @@ extension _URLEncodedFormDecoder {
             do {
                 return try parseStrategy.parse(dateString)
             } catch {
-                throw DecodingError.dataCorrupted(.init(codingPath: self.codingPath, debugDescription: "Invalid date format"))
+                throw DecodingError.dataCorrupted(.init(codingPath: self.codingPath, debugDescription: "Invalid date format", underlyingError: error))
             }
         case .custom(let closure):
             self.storage.push(container: node)
