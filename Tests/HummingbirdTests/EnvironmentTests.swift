@@ -115,6 +115,24 @@ struct EnvironmentTests {
         #expect(result.get("foo") == "baz")
     }
 
+    @Test func testDotEnvMissingFileIncludesProcessEnvironment() async throws {
+        let key = "testDotEnvMissingFileIncludesProcessEnvironment"
+        #expect(setenv(key, "from-process", 1) == 0)
+        defer { unsetenv(key) }
+
+        let result = try await Environment.dotEnv(".nonexistent-env-\(UUID().uuidString)")
+        #expect(result.get(key) == "from-process")
+    }
+
+    @Test func testMergingPreservesCaseSensitiveKeys() {
+        var sensitive = Environment(caseSensitiveKeys: true)
+        sensitive.setLocal("MyKey", value: "sensitive")
+        let insensitive = Environment(values: ["other": "value"], caseSensitiveKeys: false)
+        let merged = sensitive.merging(with: insensitive)
+        #expect(merged.get("MyKey") == "sensitive")
+        #expect(merged.get("other") == "value")
+    }
+
     @Test func testSetLocalDoesNotMutateProcessEnvironment() {
         let key = "testSetLocalDoesNotMutateProcessEnvironment"
         unsetenv(key)

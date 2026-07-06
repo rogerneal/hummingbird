@@ -60,7 +60,7 @@ public struct Environment: Sendable, Decodable, ExpressibleByDictionaryLiteral {
     }
 
     var values: [String: String]
-    var caseSensitiveKeys: Bool
+    let caseSensitiveKeys: Bool
 
     /// Initialize from environment variables
     /// - Parameter caseSensitiveKeys: When `true`, preserve the case of environment variable names.
@@ -171,7 +171,10 @@ public struct Environment: Sendable, Decodable, ExpressibleByDictionaryLiteral {
     /// set of environment variables
     /// - Parameter env: environemnt variables to merge into this environment variable set
     public func merging(with env: Environment) -> Environment {
-        .init(rawValues: self.values.merging(env.values) { $1 })
+        .init(
+            rawValues: self.values.merging(env.values) { $1 },
+            caseSensitiveKeys: self.caseSensitiveKeys || env.caseSensitiveKeys
+        )
     }
 
     /// Construct environment variable map
@@ -190,7 +193,7 @@ public struct Environment: Sendable, Decodable, ExpressibleByDictionaryLiteral {
     ///   - caseSensitiveKeys: When `true`, preserve the case of keys from the file
     public static func dotEnv(_ dotEnvPath: String = ".env", caseSensitiveKeys: Bool = false) async throws -> Self {
         guard let dotEnv = await loadDotEnv(dotEnvPath) else {
-            return .init(rawValues: [:], caseSensitiveKeys: caseSensitiveKeys)
+            return .init(caseSensitiveKeys: caseSensitiveKeys)
         }
         return try .init(rawValues: self.parseDotEnv(dotEnv, caseSensitiveKeys: caseSensitiveKeys), caseSensitiveKeys: caseSensitiveKeys)
     }
