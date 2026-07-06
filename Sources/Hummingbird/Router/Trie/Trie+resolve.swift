@@ -11,13 +11,8 @@ import NIOCore
 extension RouterTrie {
     /// Resolve a path to a `Value` if available
     @inlinable
-    public func resolve(_ path: String) -> (value: Value, parameters: Parameters)? {
-        self._resolve(path)
-    }
-
-    @usableFromInline
-    func _resolve(_ path: String) -> (value: Value, parameters: Parameters)? {
-        var context = ResolveContext(path: path, trie: trie, values: values)
+    public func resolve(_ path: String, caseInsensitive: Bool = false) -> (value: Value, parameters: Parameters)? {
+        var context = ResolveContext(path: path, trie: trie, values: values, caseInsensitive: caseInsensitive)
         return context.resolve()
     }
 
@@ -26,12 +21,14 @@ extension RouterTrie {
         @usableFromInline let path: String
         @usableFromInline let trie: Trie
         @usableFromInline let values: [Value?]
+        @usableFromInline let caseInsensitive: Bool
         @usableFromInline var parameters = Parameters()
 
-        @usableFromInline init(path: String, trie: Trie, values: [Value?]) {
+        @usableFromInline init(path: String, trie: Trie, values: [Value?], caseInsensitive: Bool) {
             self.path = path
             self.trie = trie
             self.values = values
+            self.caseInsensitive = caseInsensitive
         }
 
         @inlinable
@@ -144,29 +141,29 @@ extension RouterTrie {
         }
 
         @inlinable
-        func equals(_ lhs: Substring, _ rhs: Substring) -> Bool {
-            if RouterTrieResolveOptions.caseInsensitive {
-                lhs.lowercased() == rhs.lowercased()
+        func pathComponentMatches(_ component: Substring, constant: Substring) -> Bool {
+            if self.caseInsensitive {
+                component.lowercased() == constant.lowercased()
             } else {
-                lhs == rhs
+                component == constant
             }
         }
 
         @inlinable
-        func hasSuffix(_ lhs: Substring, _ rhs: Substring) -> Bool {
-            if RouterTrieResolveOptions.caseInsensitive {
-                lhs.lowercased().hasSuffix(rhs.lowercased())
+        func pathComponentHasSuffix(_ component: Substring, suffix: Substring) -> Bool {
+            if self.caseInsensitive {
+                component.lowercased().hasSuffix(suffix.lowercased())
             } else {
-                lhs.hasSuffix(rhs)
+                component.hasSuffix(suffix)
             }
         }
 
         @inlinable
-        func hasPrefix(_ lhs: Substring, _ rhs: Substring) -> Bool {
-            if RouterTrieResolveOptions.caseInsensitive {
-                lhs.lowercased().hasPrefix(rhs.lowercased())
+        func pathComponentHasPrefix(_ component: Substring, prefix: Substring) -> Bool {
+            if self.caseInsensitive {
+                component.lowercased().hasPrefix(prefix.lowercased())
             } else {
-                lhs.hasPrefix(rhs)
+                component.hasPrefix(prefix)
             }
         }
 
@@ -175,7 +172,7 @@ extension RouterTrie {
             switch node.token {
             case .path(let constant):
                 // The current node is a constant
-                if equals(self.trie.stringValues[Int(constant)], component) {
+                if self.pathComponentMatches(component, constant: self.trie.stringValues[Int(constant)]) {
                     return .match
                 }
 
@@ -186,7 +183,7 @@ extension RouterTrie {
             case .prefixCapture(let parameter, let suffix):
                 let suffix = self.trie.stringValues[Int(suffix)]
 
-                if hasSuffix(component, suffix) {
+                if self.pathComponentHasSuffix(component, suffix: suffix) {
                     self.parameters[self.trie.stringValues[Int(parameter)]] = component.dropLast(suffix.count)
                     return .match
                 }
@@ -194,7 +191,7 @@ extension RouterTrie {
                 return .mismatch
             case .suffixCapture(let prefix, let parameter):
                 let prefix = self.trie.stringValues[Int(prefix)]
-                if hasPrefix(component, prefix) {
+                if self.pathComponentHasPrefix(component, prefix: prefix) {
                     self.parameters[self.trie.stringValues[Int(parameter)]] = component.dropFirst(prefix.count)
                     return .match
                 }
@@ -204,13 +201,13 @@ extension RouterTrie {
                 // Always matches, descend
                 return .match
             case .prefixWildcard(let suffix):
-                if hasSuffix(component, self.trie.stringValues[Int(suffix)]) {
+                if self.pathComponentHasSuffix(component, suffix: self.trie.stringValues[Int(suffix)]) {
                     return .match
                 }
 
                 return .mismatch
             case .suffixWildcard(let prefix):
-                if hasPrefix(component, self.trie.stringValues[Int(prefix)]) {
+                if self.pathComponentHasPrefix(component, prefix: self.trie.stringValues[Int(prefix)]) {
                     return .match
                 }
 
