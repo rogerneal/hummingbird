@@ -165,11 +165,13 @@ public struct Environment: Sendable, Decodable, ExpressibleByDictionaryLiteral {
         self.values[self.storageKey(s)] = value
     }
 
-    /// Merge two environment variable sets together and return result
-    ///
-    /// If an environment variable exists in both sets it will choose the version from the second
-    /// set of environment variables
-    /// - Parameter env: environemnt variables to merge into this environment variable set
+/// Merge two environment variable sets together and return result
+///
+/// If an environment variable exists in both sets it will choose the version from the second
+/// set of environment variables.
+///
+/// The merged environment uses case-sensitive keys if either input environment uses them.
+/// - Parameter env: Environment variables to merge into this environment variable set
     public func merging(with env: Environment) -> Environment {
         .init(
             rawValues: self.values.merging(env.values) { $1 },
