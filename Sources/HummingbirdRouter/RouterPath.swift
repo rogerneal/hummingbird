@@ -57,7 +57,7 @@ extension RouterPath {
     private func match<Context: RouterRequestContext>(_ context: Context) -> Context? {
         var pathIterator = context.routerContext.remainingPathComponents.makeIterator()
         var context = context
-        let caseInsensitive = RouterTrieResolveOptions.caseInsensitive
+        let caseInsensitive = RouterBuilderState.requestOptions?.contains(.caseInsensitive) ?? false
         for component in self.components {
             switch component.value {
             case .path(let lhs):

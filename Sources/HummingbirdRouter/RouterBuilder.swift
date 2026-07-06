@@ -55,7 +55,7 @@ where Handler.Input == Request, Handler.Output == Response, Handler.Context == C
         var context = context
         let path = input.uri.path
         context.routerContext.remainingPathComponents = path.split(separator: "/")[...]
-        return try await RouterTrieResolveOptions.$caseInsensitive.withValue(self.options.contains(.caseInsensitive)) {
+        return try await RouterBuilderState.$requestOptions.withValue(self.options) {
             try await self.handler.handle(input, context: context, next: next)
         }
     }
