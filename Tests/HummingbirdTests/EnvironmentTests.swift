@@ -77,6 +77,55 @@ struct EnvironmentTests {
         #expect(env.get("testcaseinsensitive") == "testSetFromEnvironment")
     }
 
+    @Test func testCaseSensitiveKeys() {
+        var env = Environment(caseSensitiveKeys: true)
+        env.setLocal("Foo", value: "bar")
+        env.setLocal("foo", value: "baz")
+        #expect(env.get("Foo") == "bar")
+        #expect(env.get("foo") == "baz")
+        #expect(env.get("FOO") == nil)
+    }
+
+    @Test func testCaseSensitiveKeysFromProcessEnvironment() {
+        #expect(setenv("CaseSensitiveTestKey", "upper", 1) == 0)
+        #expect(setenv("casesensitivetestkey", "lower", 1) == 0)
+        defer {
+            unsetenv("CaseSensitiveTestKey")
+            unsetenv("casesensitivetestkey")
+        }
+        let env = Environment(caseSensitiveKeys: true)
+        #expect(env.get("CaseSensitiveTestKey") == "upper")
+        #expect(env.get("casesensitivetestkey") == "lower")
+    }
+
+    @Test func testCaseSensitiveDotEnv() async throws {
+        let dotenv = """
+            Foo=bar
+            foo=baz
+            """
+        let data = dotenv.data(using: .utf8)
+        let envURL = URL(fileURLWithPath: ".case-sensitive.env")
+        try data?.write(to: envURL)
+        defer {
+            try? FileManager.default.removeItem(at: envURL)
+        }
+
+        let result = try await Environment.dotEnv(".case-sensitive.env", caseSensitiveKeys: true)
+        #expect(result.get("Foo") == "bar")
+        #expect(result.get("foo") == "baz")
+    }
+
+    @Test func testSetLocalDoesNotMutateProcessEnvironment() {
+        let key = "testSetLocalDoesNotMutateProcessEnvironment"
+        unsetenv(key)
+        defer { unsetenv(key) }
+
+        var env = Environment()
+        env.setLocal(key, value: "local-only")
+        #expect(env.get(key) == "local-only")
+        #expect(Environment().get(key) == nil)
+    }
+
     @Test func testDotEnvLoading() async throws {
         let dotenv = """
             TEST=this

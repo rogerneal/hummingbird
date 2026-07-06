@@ -28,6 +28,10 @@ import Android
 #endif
 
 /// Access environment variables
+///
+/// By default, environment variable names are treated case insensitively (keys are normalized to
+/// lowercase). Pass `caseSensitiveKeys: true` to preserve Unix shell semantics where
+/// `MY_VAR` and `my_var` are distinct variables.
 public struct Environment: Sendable, Decodable, ExpressibleByDictionaryLiteral {
     public struct Error: Swift.Error, Equatable {
         enum Code {
@@ -56,42 +60,52 @@ public struct Environment: Sendable, Decodable, ExpressibleByDictionaryLiteral {
     }
 
     var values: [String: String]
+    var caseSensitiveKeys: Bool
 
     /// Initialize from environment variables
-    public init() {
-        self.values = Self.getEnvironment()
+    /// - Parameter caseSensitiveKeys: When `true`, preserve the case of environment variable names.
+    ///   Defaults to `false` (case insensitive lookup).
+    public init(caseSensitiveKeys: Bool = false) {
+        self.caseSensitiveKeys = caseSensitiveKeys
+        self.values = Self.getEnvironment(caseSensitiveKeys: caseSensitiveKeys)
     }
 
     /// Initialize from dictionary
-    public init(values: [String: String]) {
-        self.values = Self.getEnvironment()
+    /// - Parameters:
+    ///   - values: Environment variables to add
+    ///   - caseSensitiveKeys: When `true`, preserve the case of keys in `values`.
+    public init(values: [String: String], caseSensitiveKeys: Bool = false) {
+        self.caseSensitiveKeys = caseSensitiveKeys
+        self.values = Self.getEnvironment(caseSensitiveKeys: caseSensitiveKeys)
         for (key, value) in values {
-            self.values[key.lowercased()] = value
+            self.values[self.storageKey(key)] = value
         }
     }
 
     /// Initialize from dictionary literal
     public init(dictionaryLiteral elements: (String, String)...) {
-        self.values = Self.getEnvironment()
+        self.caseSensitiveKeys = false
+        self.values = Self.getEnvironment(caseSensitiveKeys: false)
         for element in elements {
-            self.values[element.0.lowercased()] = element.1
+            self.values[self.storageKey(element.0)] = element.1
         }
     }
 
     /// Initialize from Decodable
     public init(from decoder: any Decoder) throws {
-        self.values = Self.getEnvironment()
+        self.caseSensitiveKeys = false
+        self.values = Self.getEnvironment(caseSensitiveKeys: false)
         let container = try decoder.singleValueContainer()
         let decodedValues = try container.decode([String: String].self)
         for (key, value) in decodedValues {
-            self.values[key.lowercased()] = value
+            self.values[self.storageKey(key)] = value
         }
     }
 
     /// Get environment variable with name
     /// - Parameter s: Environment variable name
     public func get(_ s: String) -> String? {
-        self.values[s.lowercased()]
+        self.values[self.storageKey(s)]
     }
 
     /// Get environment variable with name as a certain type
@@ -99,13 +113,13 @@ public struct Environment: Sendable, Decodable, ExpressibleByDictionaryLiteral {
     ///   - s: Environment variable name
     ///   - as: Type we want variable to be cast to
     public func get<T: LosslessStringConvertible>(_ s: String, as: T.Type) -> T? {
-        self.values[s.lowercased()].map { T(String($0)) } ?? nil
+        self.values[self.storageKey(s)].map { T(String($0)) } ?? nil
     }
 
     /// Require environment variable with name
     /// - Parameter s: Environment variable name
     public func require(_ s: String) throws -> String {
-        guard let value = self.values[s.lowercased()] else {
+        guard let value = self.values[self.storageKey(s)] else {
             throw Error(.variableDoesNotExist, message: "Environment variable '\(s)' does not exist")
         }
         return value
@@ -127,16 +141,28 @@ public struct Environment: Sendable, Decodable, ExpressibleByDictionaryLiteral {
     ///
     /// This sets the variable within this type and also calls `setenv` so future versions
     /// of this type will also have this variable set.
+    ///
+    /// - Warning: `setenv` and `unsetenv` are not thread-safe on Linux. Only call this during
+    ///   application startup before concurrent tasks access the environment, unless you provide
+    ///   your own synchronization.
     /// - Parameters:
     ///   - s: Environment variable name
     ///   - value: Environment variable name value
     public mutating func set(_ s: String, value: String?) {
-        self.values[s.lowercased()] = value
+        self.values[self.storageKey(s)] = value
         if let value {
             setenv(s, value, 1)
         } else {
             unsetenv(s)
         }
+    }
+
+    /// Set environment variable without synchronizing the process environment.
+    ///
+    /// Updates only this ``Environment`` instance. Use when you need to override variables
+    /// for the current application without calling `setenv`.
+    public mutating func setLocal(_ s: String, value: String?) {
+        self.values[self.storageKey(s)] = value
     }
 
     /// Merge two environment variable sets together and return result
@@ -149,18 +175,24 @@ public struct Environment: Sendable, Decodable, ExpressibleByDictionaryLiteral {
     }
 
     /// Construct environment variable map
-    static func getEnvironment() -> [String: String] {
+    static func getEnvironment(caseSensitiveKeys: Bool = false) -> [String: String] {
         var values: [String: String] = [:]
         for item in ProcessInfo.processInfo.environment {
-            values[item.key.lowercased()] = item.value
+            let key = caseSensitiveKeys ? item.key : item.key.lowercased()
+            values[key] = item.value
         }
         return values
     }
 
     /// Create Environment initialised from the `.env` file
-    public static func dotEnv(_ dotEnvPath: String = ".env") async throws -> Self {
-        guard let dotEnv = await loadDotEnv(dotEnvPath) else { return [:] }
-        return try .init(rawValues: self.parseDotEnv(dotEnv))
+    /// - Parameters:
+    ///   - dotEnvPath: Path to the `.env` file
+    ///   - caseSensitiveKeys: When `true`, preserve the case of keys from the file
+    public static func dotEnv(_ dotEnvPath: String = ".env", caseSensitiveKeys: Bool = false) async throws -> Self {
+        guard let dotEnv = await loadDotEnv(dotEnvPath) else {
+            return .init(rawValues: [:], caseSensitiveKeys: caseSensitiveKeys)
+        }
+        return try .init(rawValues: self.parseDotEnv(dotEnv, caseSensitiveKeys: caseSensitiveKeys), caseSensitiveKeys: caseSensitiveKeys)
     }
 
     /// Load `.env` file into string
@@ -184,7 +216,7 @@ public struct Environment: Sendable, Decodable, ExpressibleByDictionaryLiteral {
     }
 
     /// Parse a `.env` file
-    internal static func parseDotEnv(_ dotEnv: String) throws -> [String: String] {
+    internal static func parseDotEnv(_ dotEnv: String, caseSensitiveKeys: Bool = false) throws -> [String: String] {
         enum DotEnvParserState {
             case readingKey
             case skippingEquals(key: String)
@@ -231,7 +263,7 @@ public struct Environment: Sendable, Decodable, ExpressibleByDictionaryLiteral {
                     } else {
                         value = try parser.read(until: \.isWhitespace, throwOnOverflow: false).string
                     }
-                    dotEnvDictionary[key.lowercased()] = value
+                    dotEnvDictionary[caseSensitiveKeys ? key : key.lowercased()] = value
                     state = .readingKey
                 }
             }
@@ -243,8 +275,13 @@ public struct Environment: Sendable, Decodable, ExpressibleByDictionaryLiteral {
     }
 
     /// initialize from an already processed dictionary
-    private init(rawValues: [String: String]) {
+    private init(rawValues: [String: String], caseSensitiveKeys: Bool = false) {
         self.values = rawValues
+        self.caseSensitiveKeys = caseSensitiveKeys
+    }
+
+    private func storageKey(_ key: String) -> String {
+        self.caseSensitiveKeys ? key : key.lowercased()
     }
 }
 
