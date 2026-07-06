@@ -11,8 +11,8 @@ import Hummingbird
 import HummingbirdDashboard
 import HummingbirdDashboardWS
 import HummingbirdTesting
-import HummingbirdWebSocket
 import HummingbirdWSTesting
+import HummingbirdWebSocket
 import NIOConcurrencyHelpers
 import NIOFoundationEssentialsCompat
 import Testing
@@ -64,8 +64,12 @@ struct DashboardTests {
         for i in 1...100 {
             metrics.requestStarted()
             metrics.requestFinished(
-                method: "GET", path: "/p", status: 200,
-                duration: Double(i) / 1000, requestBytes: 0, responseBytes: 0
+                method: "GET",
+                path: "/p",
+                status: 200,
+                duration: Double(i) / 1000,
+                requestBytes: 0,
+                responseBytes: 0
             )
         }
         let snapshot = metrics.snapshot()
@@ -95,6 +99,8 @@ struct DashboardTests {
         #expect(output.contains("http_route_requests_total{route=\"/prom\"} 1"))
         #expect(output.contains("http_response_size_bytes_total 1024"))
         #expect(output.contains("# TYPE http_request_duration_seconds summary"))
+        #expect(output.contains("http_request_duration_seconds_sum 0.050000"))
+        #expect(output.contains("http_request_duration_seconds_count 1"))
     }
 
     @Test func testDashboardEndToEnd() async throws {
