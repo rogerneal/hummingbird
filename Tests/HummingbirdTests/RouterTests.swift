@@ -665,6 +665,23 @@ struct RouterTests {
         }
     }
 
+    @Test func testCaseSensitiveRouting() async throws {
+        let router = Router()
+        router.get("recorded/:file") { _, context in
+            try context.parameters.require("file", as: String.self)
+        }
+        let app = Application(responder: router.buildResponder())
+        try await app.test(.router) { client in
+            try await client.execute(uri: "/recorded/MyFile.mp4", method: .get) { response in
+                #expect(response.status == .ok)
+                #expect(String(buffer: response.body) == "MyFile.mp4")
+            }
+            try await client.execute(uri: "/RECORDED/MyFile.mp4", method: .get) { response in
+                #expect(response.status == .notFound)
+            }
+        }
+    }
+
     @Test func testRecursiveWildcard() async throws {
         let router = Router()
         router.get("/api/v1/**/john") { _, context in
