@@ -82,7 +82,7 @@ extension RouterPath {
                     return nil
                 }
             case .wildcard:
-                break
+                guard pathIterator.next() != nil else { return nil }
             case .prefixWildcard(let suffix):
                 guard let pathComponent = pathIterator.next() else { return nil }
                 if !self.pathComponentHasSuffix(pathComponent, suffix: suffix, caseInsensitive: caseInsensitive) {
