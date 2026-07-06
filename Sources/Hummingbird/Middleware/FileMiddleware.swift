@@ -32,10 +32,10 @@ public protocol FileMiddlewareFileAttributes {
 
 /// Middleware for serving static files.
 ///
-/// By default, if the router throws a 404 ``HTTPError`` because a route was not found, this
-/// middleware treats the request path as a filename relative to a defined rootFolder (this
-/// defaults to "public"). It checks to see if a file exists there and if so the file contents are
-/// passed back in the response.
+/// By default, if the next responder throws a 404 (an ``HTTPResponseError`` with status
+/// ``HTTPResponse.Status/notFound``), this middleware treats the request path as a filename relative
+/// to a defined rootFolder (this defaults to "public"). It checks to see if a file exists there and
+/// if so the file contents are passed back in the response.
 ///
 /// If a route handler returns a 404 response instead of throwing, file serving is skipped unless
 /// ``serveOnNotFoundResponse`` is enabled.
