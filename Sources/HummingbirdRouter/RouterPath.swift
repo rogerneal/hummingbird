@@ -57,7 +57,7 @@ extension RouterPath {
     private func match<Context: RouterRequestContext>(_ context: Context) -> Context? {
         var pathIterator = context.routerContext.remainingPathComponents.makeIterator()
         var context = context
-        let caseInsensitive = context.routerContext.caseInsensitive
+        let caseInsensitive = RouterTrieResolveOptions.caseInsensitive
         for component in self.components {
             switch component.value {
             case .path(let lhs):
@@ -82,7 +82,7 @@ extension RouterPath {
                     return nil
                 }
             case .wildcard:
-                break
+                guard pathIterator.next() != nil else { return nil }
             case .prefixWildcard(let suffix):
                 guard let pathComponent = pathIterator.next() else { return nil }
                 if !self.pathComponentHasSuffix(pathComponent, suffix: suffix, caseInsensitive: caseInsensitive) {

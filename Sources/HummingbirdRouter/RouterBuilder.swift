@@ -54,9 +54,10 @@ where Handler.Input == Request, Handler.Output == Response, Handler.Context == C
     public func handle(_ input: Input, context: Context, next: (Input, Context) async throws -> Output) async throws -> Output {
         var context = context
         let path = input.uri.path
-        context.routerContext.caseInsensitive = self.options.contains(.caseInsensitive)
         context.routerContext.remainingPathComponents = path.split(separator: "/")[...]
-        return try await self.handler.handle(input, context: context, next: next)
+        return try await RouterTrieResolveOptions.$caseInsensitive.withValue(self.options.contains(.caseInsensitive)) {
+            try await self.handler.handle(input, context: context, next: next)
+        }
     }
 }
 
