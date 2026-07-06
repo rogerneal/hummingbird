@@ -139,8 +139,8 @@ public struct Environment: Sendable, Decodable, ExpressibleByDictionaryLiteral {
 
     /// Set environment variable
     ///
-/// This sets the variable within this type and also calls `setenv` so future versions
-/// of this type will also have this variable set (using the exact key casing passed to `set`).
+    /// This sets the variable within this type and also calls `setenv` so future versions
+    /// of this type will also have this variable set (using the exact key casing passed to `set`).
     ///
     /// - Warning: `setenv` and `unsetenv` are not thread-safe on Linux. Only call this during
     ///   application startup before concurrent tasks access the environment, unless you provide
@@ -165,13 +165,13 @@ public struct Environment: Sendable, Decodable, ExpressibleByDictionaryLiteral {
         self.values[self.storageKey(s)] = value
     }
 
-/// Merge two environment variable sets together and return result
-///
-/// If an environment variable exists in both sets it will choose the version from the second
-/// set of environment variables.
-///
-/// The merged environment uses case-sensitive keys if either input environment uses them.
-/// - Parameter env: Environment variables to merge into this environment variable set
+    /// Merge two environment variable sets together and return result
+    ///
+    /// If an environment variable exists in both sets it will choose the version from the second
+    /// set of environment variables.
+    ///
+    /// The merged environment uses case-sensitive keys if either input environment uses them.
+    /// - Parameter env: Environment variables to merge into this environment variable set
     public func merging(with env: Environment) -> Environment {
         .init(
             rawValues: self.values.merging(env.values) { $1 },
@@ -190,6 +190,9 @@ public struct Environment: Sendable, Decodable, ExpressibleByDictionaryLiteral {
     }
 
     /// Create Environment initialised from the `.env` file
+    ///
+    /// If the file cannot be read, returns an environment containing the current process
+    /// environment variables (same as ``init(caseSensitiveKeys:)``).
     /// - Parameters:
     ///   - dotEnvPath: Path to the `.env` file
     ///   - caseSensitiveKeys: When `true`, preserve the case of keys from the file
