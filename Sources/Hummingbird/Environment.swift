@@ -139,8 +139,8 @@ public struct Environment: Sendable, Decodable, ExpressibleByDictionaryLiteral {
 
     /// Set environment variable
     ///
-    /// This sets the variable within this type and also calls `setenv` so future versions
-    /// of this type will also have this variable set.
+/// This sets the variable within this type and also calls `setenv` so future versions
+/// of this type will also have this variable set (using the exact key casing passed to `set`).
     ///
     /// - Warning: `setenv` and `unsetenv` are not thread-safe on Linux. Only call this during
     ///   application startup before concurrent tasks access the environment, unless you provide
