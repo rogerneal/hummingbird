@@ -10,24 +10,19 @@ internal import Foundation
 import NIOCore
 
 enum _RouterTrieResolveOptions {
-    @TaskLocal static var caseInsensitive: Bool = false
+    @TaskLocal static var caseInsensitive = false
 }
 
 extension RouterTrie {
     /// Resolve a path to a `Value` if available
     @inlinable
     public func resolve(_ path: String) -> (value: Value, parameters: Parameters)? {
-        self._resolve(path, caseInsensitive: _RouterTrieResolveOptions.caseInsensitive)
+        self._resolve(path)
     }
 
     @usableFromInline
-    func _resolve(_ path: String, caseInsensitive: Bool) -> (value: Value, parameters: Parameters)? {
-        var context = ResolveContext(
-            path: path,
-            trie: trie,
-            values: values,
-            caseInsensitive: caseInsensitive
-        )
+    func _resolve(_ path: String) -> (value: Value, parameters: Parameters)? {
+        var context = ResolveContext(path: path, trie: trie, values: values)
         return context.resolve()
     }
 
@@ -36,14 +31,12 @@ extension RouterTrie {
         @usableFromInline let path: String
         @usableFromInline let trie: Trie
         @usableFromInline let values: [Value?]
-        @usableFromInline let caseInsensitive: Bool
         @usableFromInline var parameters = Parameters()
 
-        @usableFromInline init(path: String, trie: Trie, values: [Value?], caseInsensitive: Bool) {
+        @usableFromInline init(path: String, trie: Trie, values: [Value?]) {
             self.path = path
             self.trie = trie
             self.values = values
-            self.caseInsensitive = caseInsensitive
         }
 
         @inlinable
@@ -157,7 +150,7 @@ extension RouterTrie {
 
         @inlinable
         func equals(_ lhs: Substring, _ rhs: Substring) -> Bool {
-            if self.caseInsensitive {
+            if _RouterTrieResolveOptions.caseInsensitive {
                 lhs.caseInsensitiveCompare(rhs) == .orderedSame
             } else {
                 lhs == rhs
@@ -166,7 +159,7 @@ extension RouterTrie {
 
         @inlinable
         func hasSuffix(_ lhs: Substring, _ rhs: Substring) -> Bool {
-            if self.caseInsensitive {
+            if _RouterTrieResolveOptions.caseInsensitive {
                 lhs.suffix(rhs.count).caseInsensitiveCompare(rhs) == .orderedSame
             } else {
                 lhs.hasSuffix(rhs)
@@ -175,7 +168,7 @@ extension RouterTrie {
 
         @inlinable
         func hasPrefix(_ lhs: Substring, _ rhs: Substring) -> Bool {
-            if self.caseInsensitive {
+            if _RouterTrieResolveOptions.caseInsensitive {
                 lhs.prefix(rhs.count).caseInsensitiveCompare(rhs) == .orderedSame
             } else {
                 lhs.hasPrefix(rhs)
