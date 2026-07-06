@@ -10,7 +10,6 @@ import NIOCore
 
 extension RouterTrie {
     /// Resolve a path to a `Value` if available
-    @inlinable
     public func resolve(_ path: String) -> (value: Value, parameters: Parameters)? {
         self._resolve(path)
     }
@@ -34,7 +33,6 @@ extension RouterTrie {
             self.values = values
         }
 
-        @inlinable
         mutating func resolve() -> (value: Value, parameters: Parameters)? {
             var iterator = path.splitSequence(separator: "/").makeIterator()
 
@@ -64,7 +62,6 @@ extension RouterTrie {
             }
         }
 
-        @inlinable
         mutating func descend(
             component: Substring,
             iterator: SplitStringSequence<String>.Iterator,
@@ -120,7 +117,6 @@ extension RouterTrie {
         }
 
         /// Match sibling node for path component
-        @inlinable
         mutating func matchComponent(_ component: Substring, atNodeIndex nodeIndex: inout Int) -> TrieNode {
             while nodeIndex < self.trie.nodes.count {
                 let node = self.trie.nodes[nodeIndex]
@@ -143,7 +139,6 @@ extension RouterTrie {
             case match, mismatch, ignore, deadEnd
         }
 
-        @inlinable
         func equals(_ lhs: Substring, _ rhs: Substring) -> Bool {
             if RouterTrieResolveOptions.caseInsensitive {
                 lhs.lowercased() == rhs.lowercased()
@@ -152,7 +147,6 @@ extension RouterTrie {
             }
         }
 
-        @inlinable
         func hasSuffix(_ lhs: Substring, _ rhs: Substring) -> Bool {
             if RouterTrieResolveOptions.caseInsensitive {
                 lhs.lowercased().hasSuffix(rhs.lowercased())
@@ -161,7 +155,6 @@ extension RouterTrie {
             }
         }
 
-        @inlinable
         func hasPrefix(_ lhs: Substring, _ rhs: Substring) -> Bool {
             if RouterTrieResolveOptions.caseInsensitive {
                 lhs.lowercased().hasPrefix(rhs.lowercased())
@@ -170,7 +163,6 @@ extension RouterTrie {
             }
         }
 
-        @inlinable
         mutating func matchComponent(_ component: Substring, node: TrieNode) -> MatchResult {
             switch node.token {
             case .path(let constant):

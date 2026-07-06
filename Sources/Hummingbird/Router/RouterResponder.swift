@@ -35,7 +35,6 @@ public struct RouterResponder<Context: RequestContext>: HTTPResponder {
     ///   - request: HTTP request
     ///   - context: Request context
     /// - Returns: Response
-    @inlinable
     public func respond(to request: Request, context: Context) async throws -> Response {
         do {
             let path = request.uri.path
