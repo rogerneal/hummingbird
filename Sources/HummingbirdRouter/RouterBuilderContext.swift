@@ -13,13 +13,9 @@ public struct RouterBuilderContext: Sendable {
     /// remaining path components to match
     @usableFromInline
     var remainingPathComponents: ArraySlice<Substring>
-    /// Whether path segment comparisons should be case insensitive
-    @usableFromInline
-    var caseInsensitive: Bool
 
     public init() {
         self.remainingPathComponents = []
-        self.caseInsensitive = false
     }
 }
 

@@ -25,7 +25,7 @@ public struct RouterResponder<Context: RequestContext>: HTTPResponder {
         options: RouterOptions,
         notFoundResponder: any HTTPResponder<Context>
     ) {
-        self.trie = RouterTrie(base: trie)
+        self.trie = RouterTrie(base: trie, options: options)
         self.options = options
         self.notFoundResponder = notFoundResponder
     }
@@ -39,9 +39,8 @@ public struct RouterResponder<Context: RequestContext>: HTTPResponder {
     public func respond(to request: Request, context: Context) async throws -> Response {
         do {
             let path = request.uri.path
-            let caseInsensitive = self.options.contains(.caseInsensitive)
             guard
-                let (responderChain, parameters) = trie.resolve(path, caseInsensitive: caseInsensitive),
+                let (responderChain, parameters) = trie.resolve(path),
                 let responder = responderChain.getResponder(for: request.method)
             else {
                 return try await self.notFoundResponder.respond(to: request, context: context)
