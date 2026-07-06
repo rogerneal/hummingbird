@@ -13,11 +13,17 @@ extension RouterTrie {
     /// Resolve a path to a `Value` if available
     @inlinable
     public func resolve(_ path: String) -> (value: Value, parameters: Parameters)? {
+        self.resolve(path, caseInsensitive: false)
+    }
+
+    /// Resolve a path to a `Value` if available
+    @inlinable
+    func resolve(_ path: String, caseInsensitive: Bool) -> (value: Value, parameters: Parameters)? {
         var context = ResolveContext(
             path: path,
             trie: trie,
             values: values,
-            caseInsensitive: self.options.contains(.caseInsensitive)
+            caseInsensitive: caseInsensitive
         )
         return context.resolve()
     }
