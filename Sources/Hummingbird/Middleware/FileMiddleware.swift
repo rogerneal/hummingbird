@@ -163,7 +163,14 @@ where Provider.FileAttributes: FileMiddlewareFileAttributes {
         do {
             let response = try await next(request, context)
             if self.serveOnNotFoundResponse, response.status == .notFound {
-                return try await self.serveFile(for: request, context: context, fallbackError: HTTPError(.notFound))
+                do {
+                    return try await self.serveFile(for: request, context: context, fallbackError: HTTPError(.notFound))
+                } catch {
+                    if let httpError = error as? any HTTPResponseError, httpError.status == .notFound {
+                        return response
+                    }
+                    throw error
+                }
             }
             return response
         } catch {
@@ -191,7 +198,7 @@ where Provider.FileAttributes: FileMiddlewareFileAttributes {
 
         // Do we have a prefix to remove from the path
         if let urlBasePath {
-            // If path doesnt have prefix then throw error
+            // If path doesn't have prefix then throw error
             guard path.hasPrefix(urlBasePath) else {
                 throw fallbackError
             }

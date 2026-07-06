@@ -394,6 +394,22 @@ struct FileMiddlewareTests {
         }
     }
 
+    @Test func testOnReturnNotFoundResponseFallsBackWhenFileMissing() async throws {
+        let router = Router()
+        router.middlewares.add(FileMiddleware(".", serveOnNotFoundResponse: true))
+        router.get("testOnReturnNotFoundResponseFallsBack.html") { _, _ in
+            Response(status: .notFound, body: .init(byteBuffer: .init(string: "custom not found")))
+        }
+        let app = Application(responder: router.buildResponder())
+
+        try await app.test(.router) { client in
+            try await client.execute(uri: "/testOnReturnNotFoundResponseFallsBack.html", method: .get) { response in
+                #expect(response.status == .notFound)
+                #expect(String(buffer: response.body) == "custom not found")
+            }
+        }
+    }
+
     @Test func testOnReturnNotFoundResponseDisabledByDefault() async throws {
         let router = Router()
         router.middlewares.add(FileMiddleware("."))
