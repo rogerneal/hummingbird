@@ -46,10 +46,7 @@ extension RouterMethods where Context: WebSocketRequestContext {
                     while !Task.isCancelled {
                         do {
                             let data = try jsonEncoder.encode(metrics.snapshot())
-                            let text = String(decoding: data, as: UTF8.self)
-                            try await outbound.write(.text(text))
-                            try await Task.sleep(for: .milliseconds(refreshIntervalMS))
-                        } catch is CancellationError {
+                            try await Task.sleep(for: .milliseconds(max(refreshIntervalMS, 50)))
                             return
                         }
                     }
