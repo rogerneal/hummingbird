@@ -389,6 +389,7 @@ struct FileMiddlewareTests {
 
         try await app.test(.router) { client in
             try await client.execute(uri: "/testOnReturnNotFoundResponse.html", method: .get) { response in
+                #expect(response.status == .ok)
                 #expect(String(buffer: response.body) == text)
             }
         }
