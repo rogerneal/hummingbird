@@ -35,15 +35,23 @@ extension RouterMethods where Context: WebSocketRequestContext {
             try await withThrowingTaskGroup(of: Void.self) { group in
                 // drain inbound until the client closes the connection
                 group.addTask {
-                    for try await _ in inbound {}
+                    do {
+                        for try await _ in inbound {}
+                    } catch is CancellationError {
+                        return
+                    }
                 }
                 // push snapshots on a timer
                 group.addTask {
                     while !Task.isCancelled {
-                        let data = try jsonEncoder.encode(metrics.snapshot())
-                        let text = String(decoding: data, as: UTF8.self)
-                        try await outbound.write(.text(text))
-                        try await Task.sleep(for: .milliseconds(refreshIntervalMS))
+                        do {
+                            let data = try jsonEncoder.encode(metrics.snapshot())
+                            let text = String(decoding: data, as: UTF8.self)
+                            try await outbound.write(.text(text))
+                            try await Task.sleep(for: .milliseconds(refreshIntervalMS))
+                        } catch is CancellationError {
+                            return
+                        }
                     }
                 }
                 _ = try await group.next()

@@ -77,6 +77,7 @@ extension RouterMethods {
             resetAPIPath: configuration.enableReset ? "\(apiPath)/reset" : nil
         )
         let jsonEncoder = JSONEncoder()
+        let dashboardHTML = renderer.html()
 
         // dashboard HTML page
         let htmlHandler: @Sendable (Request, Context) async throws -> Response = { _, _ in
@@ -86,7 +87,7 @@ extension RouterMethods {
                     .contentType: "text/html; charset=utf-8",
                     .cacheControl: "no-store",
                 ],
-                body: .init(byteBuffer: ByteBuffer(string: renderer.html()))
+                body: .init(byteBuffer: ByteBuffer(string: dashboardHTML))
             )
         }
         self.get(RouterPath(configuration.path), use: htmlHandler)
