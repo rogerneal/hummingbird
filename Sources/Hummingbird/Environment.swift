@@ -63,18 +63,28 @@ public struct Environment: Sendable, Decodable, ExpressibleByDictionaryLiteral {
     let caseSensitiveKeys: Bool
 
     /// Initialize from environment variables
+    public init() {
+        self.caseSensitiveKeys = false
+        self.values = Self.getEnvironment(caseSensitiveKeys: false)
+    }
+
+    /// Initialize from environment variables with optional case-sensitive key lookup
     /// - Parameter caseSensitiveKeys: When `true`, preserve the case of environment variable names.
-    ///   Defaults to `false` (case insensitive lookup).
-    public init(caseSensitiveKeys: Bool = false) {
+    public init(caseSensitiveKeys: Bool) {
         self.caseSensitiveKeys = caseSensitiveKeys
         self.values = Self.getEnvironment(caseSensitiveKeys: caseSensitiveKeys)
     }
 
     /// Initialize from dictionary
+    public init(values: [String: String]) {
+        self.init(values: values, caseSensitiveKeys: false)
+    }
+
+    /// Initialize from dictionary with optional case-sensitive key lookup
     /// - Parameters:
     ///   - values: Environment variables to add
     ///   - caseSensitiveKeys: When `true`, preserve the case of keys in `values`.
-    public init(values: [String: String], caseSensitiveKeys: Bool = false) {
+    public init(values: [String: String], caseSensitiveKeys: Bool) {
         self.caseSensitiveKeys = caseSensitiveKeys
         self.values = Self.getEnvironment(caseSensitiveKeys: caseSensitiveKeys)
         for (key, value) in values {
@@ -192,11 +202,19 @@ public struct Environment: Sendable, Decodable, ExpressibleByDictionaryLiteral {
     /// Create Environment initialised from the `.env` file
     ///
     /// If the file cannot be read, returns an environment containing the current process
+    /// environment variables (same as ``init()``).
+    public static func dotEnv(_ dotEnvPath: String = ".env") async throws -> Self {
+        try await dotEnv(dotEnvPath, caseSensitiveKeys: false)
+    }
+
+    /// Create Environment initialised from the `.env` file with optional case-sensitive keys
+    ///
+    /// If the file cannot be read, returns an environment containing the current process
     /// environment variables (same as ``init(caseSensitiveKeys:)``).
     /// - Parameters:
     ///   - dotEnvPath: Path to the `.env` file
     ///   - caseSensitiveKeys: When `true`, preserve the case of keys from the file
-    public static func dotEnv(_ dotEnvPath: String = ".env", caseSensitiveKeys: Bool = false) async throws -> Self {
+    public static func dotEnv(_ dotEnvPath: String, caseSensitiveKeys: Bool) async throws -> Self {
         guard let dotEnv = await loadDotEnv(dotEnvPath) else {
             return .init(caseSensitiveKeys: caseSensitiveKeys)
         }
