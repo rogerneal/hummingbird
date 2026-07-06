@@ -177,7 +177,7 @@ extension URLEncodedFormTests {
             dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'"
             dateFormatter.timeZone = TimeZone(secondsFromGMT: 0)
             self.testForm(test, query: "d=2001-01-28T15:14:03.000Z", encoder: .init(dateEncodingStrategy: .formatted(dateFormatter)))
-            self.testForm(test, query: "d=2001-01-28T15:14:03Z", encoder: .init(dateEncodingStrategy: .formatStyle(.iso8601)))
+            self.testForm(test, query: "d=2001-01-28T15:14:03Z", encoder: .init(dateEncodingStrategy: .formatStyle(.init(.iso8601))))
         }
 
         @Test func testDataBlobEncode() {
