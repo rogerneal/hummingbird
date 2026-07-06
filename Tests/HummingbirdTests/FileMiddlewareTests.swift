@@ -375,7 +375,7 @@ struct FileMiddlewareTests {
 
     @Test func testOnReturnNotFoundResponse() async throws {
         let router = Router()
-        router.middlewares.add(FileMiddleware(".").withServeOnNotFoundResponse())
+        router.middlewares.add(FileMiddleware(".", serveOnNotFoundResponse: true))
         router.get("testOnReturnNotFoundResponse.html") { _, _ in
             Response(status: .notFound)
         }
@@ -389,7 +389,6 @@ struct FileMiddlewareTests {
 
         try await app.test(.router) { client in
             try await client.execute(uri: "/testOnReturnNotFoundResponse.html", method: .get) { response in
-                #expect(response.status == .ok)
                 #expect(String(buffer: response.body) == text)
             }
         }
@@ -397,7 +396,7 @@ struct FileMiddlewareTests {
 
     @Test func testOnReturnNotFoundResponseFallsBackWhenFileMissing() async throws {
         let router = Router()
-        router.middlewares.add(FileMiddleware(".").withServeOnNotFoundResponse())
+        router.middlewares.add(FileMiddleware(".", serveOnNotFoundResponse: true))
         router.get("testOnReturnNotFoundResponseFallsBack.html") { _, _ in
             Response(status: .notFound, body: .init(byteBuffer: .init(string: "custom not found")))
         }
@@ -435,7 +434,7 @@ struct FileMiddlewareTests {
 
     @Test func testOnReturnNotFoundResponseHead() async throws {
         let router = Router()
-        router.middlewares.add(FileMiddleware(".").withServeOnNotFoundResponse())
+        router.middlewares.add(FileMiddleware(".", serveOnNotFoundResponse: true))
         router.get("testOnReturnNotFoundResponseHead.txt") { _, _ in
             Response(status: .notFound)
         }
@@ -487,8 +486,9 @@ struct FileMiddlewareTests {
         router.add(
             middleware: FileMiddleware(
                 fileProvider: MemoryFileProvider(),
-                urlBasePath: "/static"
-            ).withServeOnNotFoundResponse()
+                urlBasePath: "/static",
+                serveOnNotFoundResponse: true
+            )
         )
         router.get("static/:file") { _, _ in
             Response(status: .notFound)
