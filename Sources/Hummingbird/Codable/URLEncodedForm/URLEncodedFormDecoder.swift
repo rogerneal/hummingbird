@@ -32,21 +32,6 @@ public struct URLEncodedFormDecoder: Sendable {
         case custom(@Sendable (_ decoder: any Decoder) throws -> Date)
     }
 
-    /// Decode the `Date` as a string parsed by the given strategy.
-    public static func parseStrategy(_ strategy: URLEncodedFormDateParseStrategy) -> Self {
-        .custom { decoder in
-            let container = try decoder.singleValueContainer()
-            let dateString = try container.decode(String.self)
-            do {
-                return try strategy.parse(dateString)
-            } catch {
-                throw DecodingError.dataCorrupted(
-                    .init(codingPath: decoder.codingPath, debugDescription: "Invalid date format", underlyingError: error)
-                )
-            }
-        }
-    }
-
     /// The strategy to use in Encoding dates. Defaults to `.deferredToDate`.
     public var dateDecodingStrategy: DateDecodingStrategy
 
@@ -721,4 +706,26 @@ private struct URLEncodedFormDecodingStorage {
 
     /// pop a container from the storage
     @discardableResult mutating func popContainer() -> URLEncodedFormNode { self.containers.removeLast() }
+}
+
+@available(hummingbird 2.0, *)
+extension URLEncodedFormDecoder.DateDecodingStrategy {
+    /// Decode the `Date` as a string parsed by the given strategy.
+    public static func parseStrategy<S: ParseStrategy & Sendable>(_ strategy: S) -> Self where S.ParseInput == String, S.ParseOutput == Date {
+        .custom { decoder in
+            guard let decoder = decoder as? _URLEncodedFormDecoder else {
+                throw DecodingError.dataCorrupted(
+                    .init(codingPath: decoder.codingPath, debugDescription: "Unexpected decoder for URL encoded form date decoding")
+                )
+            }
+            let dateString = try decoder.unbox(decoder.storage.topContainer, as: String.self)
+            do {
+                return try strategy.parse(dateString)
+            } catch {
+                throw DecodingError.dataCorrupted(
+                    .init(codingPath: decoder.codingPath, debugDescription: "Invalid date format", underlyingError: error)
+                )
+            }
+        }
+    }
 }
