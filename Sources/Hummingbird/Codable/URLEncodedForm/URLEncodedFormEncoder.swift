@@ -58,11 +58,16 @@ public struct URLEncodedFormEncoder: Sendable {
         /// Encode the `Date` as a string parsed by the given formatter.
         case formatted(DateFormatter)
 
-        /// Encode the `Date` as a string formatted by the given style.
-        case formatStyle(URLEncodedFormDateFormatStyle)
-
         /// Encode the `Date` as a custom value encoded by the given closure.
         case custom(@Sendable (Date, any Encoder) throws -> Void)
+    }
+
+    /// Encode the `Date` as a string formatted by the given style.
+    public static func formatStyle(_ style: URLEncodedFormDateFormatStyle) -> Self {
+        .custom { date, encoder in
+            var container = encoder.singleValueContainer()
+            try container.encode(style.format(date))
+        }
     }
 
     /// The strategy to use in Encoding dates. Defaults to `.deferredToDate`.
@@ -360,8 +365,6 @@ extension _URLEncodedFormEncoder {
             try self.encode(date.formatted(.iso8601))
         case .formatted(let formatter):
             try self.encode(formatter.string(from: date))
-        case .formatStyle(let formatStyle):
-            try self.encode(formatStyle.format(date))
         case .custom(let closure):
             try closure(date, self)
         }

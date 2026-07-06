@@ -28,11 +28,23 @@ public struct URLEncodedFormDecoder: Sendable {
         /// Decode the `Date` as a string parsed by the given formatter.
         case formatted(DateFormatter)
 
-        /// Decode the `Date` as a string parsed by the given strategy.
-        case parseStrategy(URLEncodedFormDateParseStrategy)
-
         /// Decode the `Date` as a custom value encoded by the given closure.
         case custom(@Sendable (_ decoder: any Decoder) throws -> Date)
+    }
+
+    /// Decode the `Date` as a string parsed by the given strategy.
+    public static func parseStrategy(_ strategy: URLEncodedFormDateParseStrategy) -> Self {
+        .custom { decoder in
+            let container = try decoder.singleValueContainer()
+            let dateString = try container.decode(String.self)
+            do {
+                return try strategy.parse(dateString)
+            } catch {
+                throw DecodingError.dataCorrupted(
+                    .init(codingPath: decoder.codingPath, debugDescription: "Invalid date format", underlyingError: error)
+                )
+            }
+        }
     }
 
     /// The strategy to use in Encoding dates. Defaults to `.deferredToDate`.
@@ -657,13 +669,6 @@ extension _URLEncodedFormDecoder {
                 throw DecodingError.dataCorrupted(.init(codingPath: self.codingPath, debugDescription: "Invalid date format"))
             }
             return date
-        case .parseStrategy(let parseStrategy):
-            let dateString = try unbox(node, as: String.self)
-            do {
-                return try parseStrategy.parse(dateString)
-            } catch {
-                throw DecodingError.dataCorrupted(.init(codingPath: self.codingPath, debugDescription: "Invalid date format", underlyingError: error))
-            }
         case .custom(let closure):
             self.storage.push(container: node)
             defer { self.storage.popContainer() }
