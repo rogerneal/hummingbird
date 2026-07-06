@@ -6,7 +6,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-internal import Foundation
 import NIOCore
 
 enum _RouterTrieResolveOptions {
