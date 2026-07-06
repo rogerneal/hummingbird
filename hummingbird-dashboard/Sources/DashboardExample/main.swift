@@ -36,17 +36,17 @@ router.get("/") { _, _ in
         body: .init(
             byteBuffer: .init(
                 string: """
-                    <html><body style="font-family: system-ui; max-width: 640px; margin: 60px auto;">
-                    <h1>Hummingbird Dashboard Example</h1>
-                    <p>Simulated traffic is running in the background. The dashboard uses WebSocket push with polling fallback.</p>
-                    <ul>
-                        <li><a href="/dashboard">Dashboard UI</a></li>
-                        <li><a href="/dashboard/api/metrics">Metrics JSON</a></li>
-                        <li><a href="/dashboard/api/health">Health check</a></li>
-                        <li><a href="/metrics">Prometheus metrics</a></li>
-                    </ul>
-                    </body></html>
-                    """
+                <html><body style="font-family: system-ui; max-width: 640px; margin: 60px auto;">
+                <h1>Hummingbird Dashboard Example</h1>
+                <p>Simulated traffic is running in the background. The dashboard uses WebSocket push with polling fallback.</p>
+                <ul>
+                    <li><a href="/dashboard">Dashboard UI</a></li>
+                    <li><a href="/dashboard/api/metrics">Metrics JSON</a></li>
+                    <li><a href="/dashboard/api/health">Health check</a></li>
+                    <li><a href="/metrics">Prometheus metrics</a></li>
+                </ul>
+                </body></html>
+                """
             )
         )
     )

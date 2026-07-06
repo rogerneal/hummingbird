@@ -9,7 +9,6 @@
 import Dispatch
 import Hummingbird
 import HummingbirdCore
-import NIOConcurrencyHelpers
 
 /// Middleware recording request metrics for the Hummingbird dashboard.
 ///
@@ -42,12 +41,13 @@ public struct DashboardMiddleware<Context: RequestContext>: RouterMiddleware {
         do {
             var response = try await next(request, context)
             let responseStatus = response.status.code
+            let responseBytes = response.body.contentLength ?? 0
             let metrics = self.metrics
             let method = request.method.rawValue
             let requestPath = request.uri.path
             // record once the response has been written, at which point the
             // endpoint path (route template) is guaranteed to be set
-            response.body = response.body.withPostWriteAction { responseBytes in
+            response.body = response.body.withPostWriteAction {
                 let duration = Double(DispatchTime.now().uptimeNanoseconds - startTime) / 1_000_000_000
                 metrics.requestFinished(
                     method: method,
@@ -82,26 +82,18 @@ public struct DashboardMiddleware<Context: RequestContext>: RouterMiddleware {
 
 extension ResponseBody {
     /// Return a response body that runs a closure after the original body has been
-    /// fully written to the channel, passing the actual number of bytes written.
+    /// fully written to the channel.
     ///
     /// Public-API equivalent of HummingbirdCore's package-scoped `withPostWriteClosure`,
-    /// so this package can live outside the hummingbird repository. Unlike a plain
-    /// post-write closure, this variant intercepts each `ByteBuffer` as it is written
-    /// so that the true byte count is available even for streaming/unknown-length bodies.
-    func withPostWriteAction(_ postWrite: @escaping @Sendable (_ responseBytes: Int) async -> Void) -> Self {
+    /// so this package can live outside the hummingbird repository.
+    func withPostWriteAction(_ postWrite: @escaping @Sendable () async -> Void) -> Self {
         let body = self
         return .init(contentLength: self.contentLength) { writer in
-            let byteCounter = NIOLockedValueBox<Int>(0)
             do {
-                try await body.write(
-                    writer.map { buffer in
-                        byteCounter.withLockedValue { $0 += buffer.readableBytes }
-                        return buffer
-                    }
-                )
-                await postWrite(byteCounter.withLockedValue { $0 })
+                try await body.write(writer)
+                await postWrite()
             } catch {
-                await postWrite(byteCounter.withLockedValue { $0 })
+                await postWrite()
                 throw error
             }
         }

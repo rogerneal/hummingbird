@@ -43,13 +43,12 @@ extension RouterMethods where Context: WebSocketRequestContext {
                 }
                 // push snapshots on a timer
                 group.addTask {
-                    let intervalMS = max(refreshIntervalMS, 50)
                     while !Task.isCancelled {
                         do {
                             let data = try jsonEncoder.encode(metrics.snapshot())
                             let text = String(decoding: data, as: UTF8.self)
                             try await outbound.write(.text(text))
-                            try await Task.sleep(for: .milliseconds(intervalMS))
+                            try await Task.sleep(for: .milliseconds(refreshIntervalMS))
                         } catch is CancellationError {
                             return
                         }
