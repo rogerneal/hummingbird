@@ -375,7 +375,7 @@ struct FileMiddlewareTests {
 
     @Test func testOnReturnNotFoundResponse() async throws {
         let router = Router()
-        router.middlewares.add(FileMiddleware(".", serveOnNotFoundResponse: true))
+        router.middlewares.add(FileMiddleware(".").withServeOnNotFoundResponse())
         router.get("testOnReturnNotFoundResponse.html") { _, _ in
             Response(status: .notFound)
         }
@@ -397,7 +397,7 @@ struct FileMiddlewareTests {
 
     @Test func testOnReturnNotFoundResponseFallsBackWhenFileMissing() async throws {
         let router = Router()
-        router.middlewares.add(FileMiddleware(".", serveOnNotFoundResponse: true))
+        router.middlewares.add(FileMiddleware(".").withServeOnNotFoundResponse())
         router.get("testOnReturnNotFoundResponseFallsBack.html") { _, _ in
             Response(status: .notFound, body: .init(byteBuffer: .init(string: "custom not found")))
         }
@@ -435,7 +435,7 @@ struct FileMiddlewareTests {
 
     @Test func testOnReturnNotFoundResponseHead() async throws {
         let router = Router()
-        router.middlewares.add(FileMiddleware(".", serveOnNotFoundResponse: true))
+        router.middlewares.add(FileMiddleware(".").withServeOnNotFoundResponse())
         router.get("testOnReturnNotFoundResponseHead.txt") { _, _ in
             Response(status: .notFound)
         }
@@ -487,9 +487,8 @@ struct FileMiddlewareTests {
         router.add(
             middleware: FileMiddleware(
                 fileProvider: MemoryFileProvider(),
-                urlBasePath: "/static",
-                serveOnNotFoundResponse: true
-            )
+                urlBasePath: "/static"
+            ).withServeOnNotFoundResponse()
         )
         router.get("static/:file") { _, _ in
             Response(status: .notFound)

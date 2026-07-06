@@ -38,7 +38,7 @@ public protocol FileMiddlewareFileAttributes {
 /// if so the file contents are passed back in the response.
 ///
 /// If a route handler returns a 404 response instead of throwing, file serving is skipped unless
-/// ``serveOnNotFoundResponse`` is enabled.
+/// enabled via ``withServeOnNotFoundResponse(_:)``.
 ///
 /// The file middleware supports both HEAD and GET methods and supports parsing of
 /// "if-modified-since", "if-none-match", "if-range" and 'range" headers. It will output "content-length",
@@ -60,7 +60,6 @@ where Provider.FileAttributes: FileMiddlewareFileAttributes {
     ///   - urlBasePath: Prefix to remove from request URL
     ///   - cacheControl: What cache control headers to include in response
     ///   - searchForIndexHtml: Should we look for index.html in folders
-    ///   - serveOnNotFoundResponse: Should we attempt to serve a file when a route returns a 404 response
     ///   - threadPool: ThreadPool used by file loading
     ///   - logger: Logger used to output file information
     public init(
@@ -68,7 +67,6 @@ where Provider.FileAttributes: FileMiddlewareFileAttributes {
         urlBasePath: String? = nil,
         cacheControl: CacheControl = .init([]),
         searchForIndexHtml: Bool = false,
-        serveOnNotFoundResponse: Bool = false,
         threadPool: NIOThreadPool = NIOThreadPool.singleton,
         logger: Logger = Logger(label: "FileMiddleware")
     ) where Provider == LocalFileSystem {
@@ -81,7 +79,6 @@ where Provider.FileAttributes: FileMiddlewareFileAttributes {
             urlBasePath: urlBasePath,
             cacheControl: cacheControl,
             searchForIndexHtml: searchForIndexHtml,
-            serveOnNotFoundResponse: serveOnNotFoundResponse,
             mediaTypeFileExtensionMap: [:]
         )
     }
@@ -92,20 +89,17 @@ where Provider.FileAttributes: FileMiddlewareFileAttributes {
     ///   - urlBasePath: Prefix to remove from request URL
     ///   - cacheControl: What cache control headers to include in response
     ///   - searchForIndexHtml: Should we look for index.html in folders
-    ///   - serveOnNotFoundResponse: Should we attempt to serve a file when a route returns a 404 response
     public init(
         fileProvider: Provider,
         urlBasePath: String? = nil,
         cacheControl: CacheControl = .init([]),
-        searchForIndexHtml: Bool = false,
-        serveOnNotFoundResponse: Bool = false
+        searchForIndexHtml: Bool = false
     ) {
         self.init(
             fileProvider: fileProvider,
             urlBasePath: urlBasePath,
             cacheControl: cacheControl,
             searchForIndexHtml: searchForIndexHtml,
-            serveOnNotFoundResponse: serveOnNotFoundResponse,
             mediaTypeFileExtensionMap: [:]
         )
     }
@@ -155,6 +149,20 @@ where Provider.FileAttributes: FileMiddlewareFileAttributes {
             searchForIndexHtml: searchForIndexHtml,
             serveOnNotFoundResponse: serveOnNotFoundResponse,
             mediaTypeFileExtensionMap: extensions
+        )
+    }
+
+    /// Enable serving static files when a route handler returns a 404 response instead of throwing.
+    ///
+    /// - Parameter enabled: When `true`, attempt to serve a file for returned 404 responses.
+    public func withServeOnNotFoundResponse(_ enabled: Bool = true) -> FileMiddleware {
+        FileMiddleware(
+            fileProvider: fileProvider,
+            urlBasePath: urlBasePath,
+            cacheControl: cacheControl,
+            searchForIndexHtml: searchForIndexHtml,
+            serveOnNotFoundResponse: enabled,
+            mediaTypeFileExtensionMap: mediaTypeFileExtensionMap
         )
     }
 
