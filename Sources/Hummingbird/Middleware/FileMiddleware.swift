@@ -32,13 +32,12 @@ public protocol FileMiddlewareFileAttributes {
 
 /// Middleware for serving static files.
 ///
-/// By default, if the next responder throws a 404 (an ``HTTPResponseError`` with status
-/// ``HTTPResponse.Status/notFound``), this middleware treats the request path as a filename relative
-/// to a defined rootFolder (this defaults to "public"). It checks to see if a file exists there and
-/// if so the file contents are passed back in the response.
+/// If router returns a 404 ie a route was not found then this middleware will treat the request
+/// path as a filename relative to a defined rootFolder (this defaults to "public"). It checks to see if
+/// a file exists there and if so the file contents are passed back in the response.
 ///
 /// If a route handler returns a 404 response instead of throwing, file serving is skipped unless
-/// enabled via ``withServeOnNotFoundResponse(_:)``.
+/// you opt in with ``withServeOnNotFoundResponse(_:)``.
 ///
 /// The file middleware supports both HEAD and GET methods and supports parsing of
 /// "if-modified-since", "if-none-match", "if-range" and 'range" headers. It will output "content-length",
