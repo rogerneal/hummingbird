@@ -93,10 +93,12 @@ extension ResponseBody {
         return .init(contentLength: self.contentLength) { writer in
             let byteCounter = NIOLockedValueBox<Int>(0)
             do {
-                try await body.write(writer.map { buffer in
-                    byteCounter.withLockedValue { $0 += buffer.readableBytes }
-                    return buffer
-                })
+                try await body.write(
+                    writer.map { buffer in
+                        byteCounter.withLockedValue { $0 += buffer.readableBytes }
+                        return buffer
+                    }
+                )
                 await postWrite(byteCounter.withLockedValue { $0 })
             } catch {
                 await postWrite(byteCounter.withLockedValue { $0 })
