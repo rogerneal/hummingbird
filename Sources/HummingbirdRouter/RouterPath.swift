@@ -30,27 +30,53 @@ extension RouterPath {
         return self.match(context)
     }
 
+    private func pathComponentMatches(_ lhs: Substring, _ rhs: Substring, caseInsensitive: Bool) -> Bool {
+        if caseInsensitive {
+            lhs.lowercased() == rhs.lowercased()
+        } else {
+            lhs == rhs
+        }
+    }
+
+    private func pathComponentHasSuffix(_ component: Substring, suffix: Substring, caseInsensitive: Bool) -> Bool {
+        if caseInsensitive {
+            component.lowercased().hasSuffix(suffix)
+        } else {
+            component.hasSuffix(suffix)
+        }
+    }
+
+    private func pathComponentHasPrefix(_ component: Substring, prefix: Substring, caseInsensitive: Bool) -> Bool {
+        if caseInsensitive {
+            component.lowercased().hasPrefix(prefix)
+        } else {
+            component.hasPrefix(prefix)
+        }
+    }
+
     private func match<Context: RouterRequestContext>(_ context: Context) -> Context? {
         var pathIterator = context.routerContext.remainingPathComponents.makeIterator()
         var context = context
+        let caseInsensitive = context.routerContext.caseInsensitive
         for component in self.components {
             switch component.value {
             case .path(let lhs):
-                if lhs != pathIterator.next()! {
+                guard let rhs = pathIterator.next() else { return nil }
+                if !self.pathComponentMatches(lhs, rhs, caseInsensitive: caseInsensitive) {
                     return nil
                 }
             case .capture(let key):
                 context.coreContext.parameters[key] = pathIterator.next()!
             case .prefixCapture(let suffix, let key):
                 let pathComponent = pathIterator.next()!
-                if pathComponent.hasSuffix(suffix) {
+                if self.pathComponentHasSuffix(pathComponent, suffix: suffix, caseInsensitive: caseInsensitive) {
                     context.coreContext.parameters[key] = pathComponent.dropLast(suffix.count)
                 } else {
                     return nil
                 }
             case .suffixCapture(let prefix, let key):
                 let pathComponent = pathIterator.next()!
-                if pathComponent.hasPrefix(prefix) {
+                if self.pathComponentHasPrefix(pathComponent, prefix: prefix, caseInsensitive: caseInsensitive) {
                     context.coreContext.parameters[key] = pathComponent.dropFirst(prefix.count)
                 } else {
                     return nil
@@ -58,13 +84,13 @@ extension RouterPath {
             case .wildcard:
                 break
             case .prefixWildcard(let suffix):
-                if pathIterator.next()!.hasSuffix(suffix) {
-                } else {
+                guard let pathComponent = pathIterator.next() else { return nil }
+                if !self.pathComponentHasSuffix(pathComponent, suffix: suffix, caseInsensitive: caseInsensitive) {
                     return nil
                 }
             case .suffixWildcard(let prefix):
-                if pathIterator.next()!.hasPrefix(prefix) {
-                } else {
+                guard let pathComponent = pathIterator.next() else { return nil }
+                if !self.pathComponentHasPrefix(pathComponent, prefix: prefix, caseInsensitive: caseInsensitive) {
                     return nil
                 }
             case .recursiveWildcard:

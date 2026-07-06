@@ -11,8 +11,8 @@ import NIOCore
 extension RouterTrie {
     /// Resolve a path to a `Value` if available
     @inlinable
-    public func resolve(_ path: String) -> (value: Value, parameters: Parameters)? {
-        var context = ResolveContext(path: path, trie: trie, values: values)
+    public func resolve(_ path: String, caseInsensitive: Bool = false) -> (value: Value, parameters: Parameters)? {
+        var context = ResolveContext(path: path, trie: trie, values: values, caseInsensitive: caseInsensitive)
         return context.resolve()
     }
 
@@ -21,12 +21,14 @@ extension RouterTrie {
         @usableFromInline let path: String
         @usableFromInline let trie: Trie
         @usableFromInline let values: [Value?]
+        @usableFromInline let caseInsensitive: Bool
         @usableFromInline var parameters = Parameters()
 
-        @usableFromInline init(path: String, trie: Trie, values: [Value?]) {
+        @usableFromInline init(path: String, trie: Trie, values: [Value?], caseInsensitive: Bool) {
             self.path = path
             self.trie = trie
             self.values = values
+            self.caseInsensitive = caseInsensitive
         }
 
         @inlinable
@@ -139,11 +141,38 @@ extension RouterTrie {
         }
 
         @inlinable
+        func pathComponentMatches(_ component: Substring, constant: Substring) -> Bool {
+            if self.caseInsensitive {
+                component.lowercased() == constant
+            } else {
+                component == constant
+            }
+        }
+
+        @inlinable
+        func pathComponentHasSuffix(_ component: Substring, suffix: Substring) -> Bool {
+            if self.caseInsensitive {
+                component.lowercased().hasSuffix(suffix)
+            } else {
+                component.hasSuffix(suffix)
+            }
+        }
+
+        @inlinable
+        func pathComponentHasPrefix(_ component: Substring, prefix: Substring) -> Bool {
+            if self.caseInsensitive {
+                component.lowercased().hasPrefix(prefix)
+            } else {
+                component.hasPrefix(prefix)
+            }
+        }
+
+        @inlinable
         mutating func matchComponent(_ component: Substring, node: TrieNode) -> MatchResult {
             switch node.token {
             case .path(let constant):
                 // The current node is a constant
-                if self.trie.stringValues[Int(constant)] == component {
+                if self.pathComponentMatches(component, constant: self.trie.stringValues[Int(constant)]) {
                     return .match
                 }
 
@@ -154,7 +183,7 @@ extension RouterTrie {
             case .prefixCapture(let parameter, let suffix):
                 let suffix = self.trie.stringValues[Int(suffix)]
 
-                if component.hasSuffix(suffix) {
+                if self.pathComponentHasSuffix(component, suffix: suffix) {
                     self.parameters[self.trie.stringValues[Int(parameter)]] = component.dropLast(suffix.count)
                     return .match
                 }
@@ -162,7 +191,7 @@ extension RouterTrie {
                 return .mismatch
             case .suffixCapture(let prefix, let parameter):
                 let prefix = self.trie.stringValues[Int(prefix)]
-                if component.hasPrefix(prefix) {
+                if self.pathComponentHasPrefix(component, prefix: prefix) {
                     self.parameters[self.trie.stringValues[Int(parameter)]] = component.dropFirst(prefix.count)
                     return .match
                 }
@@ -172,13 +201,13 @@ extension RouterTrie {
                 // Always matches, descend
                 return .match
             case .prefixWildcard(let suffix):
-                if component.hasSuffix(self.trie.stringValues[Int(suffix)]) {
+                if self.pathComponentHasSuffix(component, suffix: self.trie.stringValues[Int(suffix)]) {
                     return .match
                 }
 
                 return .mismatch
             case .suffixWildcard(let prefix):
-                if component.hasPrefix(self.trie.stringValues[Int(prefix)]) {
+                if self.pathComponentHasPrefix(component, prefix: self.trie.stringValues[Int(prefix)]) {
                     return .match
                 }
 
