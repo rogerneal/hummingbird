@@ -8,36 +8,6 @@
 
 public import Foundation
 
-/// Type-erased, sendable date format style for URL encoded form encoding.
-@available(hummingbird 2.0, *)
-public struct URLEncodedFormDateFormatStyle: Sendable {
-    private let _format: @Sendable (Date) -> String
-
-    /// Create a format style wrapper from a Foundation format style.
-    public init<S: FormatStyle & Sendable>(_ style: S) where S.FormatInput == Date, S.FormatOutput == String {
-        self._format = { $0.formatted(style) }
-    }
-
-    func format(_ date: Date) -> String {
-        self._format(date)
-    }
-}
-
-/// Type-erased, sendable date parse strategy for URL encoded form decoding.
-@available(hummingbird 2.0, *)
-public struct URLEncodedFormDateParseStrategy: Sendable {
-    private let _parse: @Sendable (String) throws -> Date
-
-    /// Create a parse strategy wrapper from a Foundation parse strategy.
-    public init<S: ParseStrategy & Sendable>(_ strategy: S) where S.ParseInput == String, S.ParseOutput == Date {
-        self._parse = { try strategy.parse($0) }
-    }
-
-    func parse(_ value: String) throws -> Date {
-        try self._parse(value)
-    }
-}
-
 /// The wrapper struct for encoding Codable classes to URL encoded form data
 @available(hummingbird 2.0, *)
 public struct URLEncodedFormEncoder: Sendable {
@@ -57,9 +27,6 @@ public struct URLEncodedFormEncoder: Sendable {
 
         /// Encode the `Date` as a string parsed by the given formatter.
         case formatted(DateFormatter)
-
-        /// Encode the `Date` as a string formatted by the given style.
-        case formatStyle(URLEncodedFormDateFormatStyle)
 
         /// Encode the `Date` as a custom value encoded by the given closure.
         case custom(@Sendable (Date, any Encoder) throws -> Void)
@@ -360,8 +327,6 @@ extension _URLEncodedFormEncoder {
             try self.encode(date.formatted(.iso8601))
         case .formatted(let formatter):
             try self.encode(formatter.string(from: date))
-        case .formatStyle(let formatStyle):
-            try self.encode(formatStyle.format(date))
         case .custom(let closure):
             try closure(date, self)
         }
@@ -425,5 +390,16 @@ private struct URLEncodedFormEncoderStorage {
     /// pop a container from the storage
     @discardableResult mutating func popContainer() -> URLEncodedFormNode {
         self.containers.removeLast()
+    }
+}
+
+@available(hummingbird 2.0, *)
+extension URLEncodedFormEncoder.DateEncodingStrategy {
+    /// Encode the `Date` as a string formatted by the given style.
+    public static func formatStyle<S: FormatStyle & Sendable>(_ style: S) -> Self where S.FormatInput == Date, S.FormatOutput == String {
+        .custom { date, encoder in
+            var container = encoder.singleValueContainer()
+            try container.encode(date.formatted(style))
+        }
     }
 }
