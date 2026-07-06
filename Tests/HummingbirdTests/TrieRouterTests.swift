@@ -217,4 +217,11 @@ struct TrieRouterTests {
         #expect(trie.resolve("/File.JPG", caseInsensitive: true)?.value == "file")
         #expect(trie.resolve("/File.JPG", caseInsensitive: true)?.parameters.get("ext") == "JPG")
     }
+
+    @Test func testCaseInsensitivePrefixWildcardUppercaseSuffix() {
+        let trieBuilder = RouterPathTrieBuilder<String>()
+        trieBuilder.addEntry("*.TXT", value: "prefixWildcard")
+        let trie = trieBuilder.build()
+        #expect(trie.resolve("/file.txt", caseInsensitive: true)?.value == "prefixWildcard")
+    }
 }

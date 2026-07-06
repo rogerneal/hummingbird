@@ -40,7 +40,7 @@ extension RouterPath {
 
     private func pathComponentHasSuffix(_ component: Substring, suffix: Substring, caseInsensitive: Bool) -> Bool {
         if caseInsensitive {
-            component.lowercased().hasSuffix(suffix)
+            component.lowercased().hasSuffix(suffix.lowercased())
         } else {
             component.hasSuffix(suffix)
         }
@@ -48,7 +48,7 @@ extension RouterPath {
 
     private func pathComponentHasPrefix(_ component: Substring, prefix: Substring, caseInsensitive: Bool) -> Bool {
         if caseInsensitive {
-            component.lowercased().hasPrefix(prefix)
+            component.lowercased().hasPrefix(prefix.lowercased())
         } else {
             component.hasPrefix(prefix)
         }

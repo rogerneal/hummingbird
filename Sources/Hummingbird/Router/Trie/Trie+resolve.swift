@@ -143,7 +143,7 @@ extension RouterTrie {
         @inlinable
         func pathComponentMatches(_ component: Substring, constant: Substring) -> Bool {
             if self.caseInsensitive {
-                component.lowercased() == constant
+                component.lowercased() == constant.lowercased()
             } else {
                 component == constant
             }
@@ -152,7 +152,7 @@ extension RouterTrie {
         @inlinable
         func pathComponentHasSuffix(_ component: Substring, suffix: Substring) -> Bool {
             if self.caseInsensitive {
-                component.lowercased().hasSuffix(suffix)
+                component.lowercased().hasSuffix(suffix.lowercased())
             } else {
                 component.hasSuffix(suffix)
             }
@@ -161,7 +161,7 @@ extension RouterTrie {
         @inlinable
         func pathComponentHasPrefix(_ component: Substring, prefix: Substring) -> Bool {
             if self.caseInsensitive {
-                component.lowercased().hasPrefix(prefix)
+                component.lowercased().hasPrefix(prefix.lowercased())
             } else {
                 component.hasPrefix(prefix)
             }
