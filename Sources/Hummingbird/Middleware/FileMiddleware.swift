@@ -32,9 +32,13 @@ public protocol FileMiddlewareFileAttributes {
 
 /// Middleware for serving static files.
 ///
-/// If router returns a 404 ie a route was not found then this middleware will treat the request
-/// path as a filename relative to a defined rootFolder (this defaults to "public"). It checks to see if
-/// a file exists there and if so the file contents are passed back in the response.
+/// By default, if the router throws a 404 ``HTTPError`` because a route was not found, this
+/// middleware treats the request path as a filename relative to a defined rootFolder (this
+/// defaults to "public"). It checks to see if a file exists there and if so the file contents are
+/// passed back in the response.
+///
+/// If a route handler returns a 404 response instead of throwing, file serving is skipped unless
+/// ``serveOnNotFoundResponse`` is enabled.
 ///
 /// The file middleware supports both HEAD and GET methods and supports parsing of
 /// "if-modified-since", "if-none-match", "if-range" and 'range" headers. It will output "content-length",
@@ -45,6 +49,7 @@ public struct FileMiddleware<Context: RequestContext, Provider: FileProvider>: R
 where Provider.FileAttributes: FileMiddlewareFileAttributes {
     let cacheControl: CacheControl
     let searchForIndexHtml: Bool
+    let serveOnNotFoundResponse: Bool
     let urlBasePath: String?
     let fileProvider: Provider
     let mediaTypeFileExtensionMap: [MediaType.FileExtension: MediaType]
@@ -55,6 +60,7 @@ where Provider.FileAttributes: FileMiddlewareFileAttributes {
     ///   - urlBasePath: Prefix to remove from request URL
     ///   - cacheControl: What cache control headers to include in response
     ///   - searchForIndexHtml: Should we look for index.html in folders
+    ///   - serveOnNotFoundResponse: Should we attempt to serve a file when a route returns a 404 response
     ///   - threadPool: ThreadPool used by file loading
     ///   - logger: Logger used to output file information
     public init(
@@ -62,6 +68,7 @@ where Provider.FileAttributes: FileMiddlewareFileAttributes {
         urlBasePath: String? = nil,
         cacheControl: CacheControl = .init([]),
         searchForIndexHtml: Bool = false,
+        serveOnNotFoundResponse: Bool = false,
         threadPool: NIOThreadPool = NIOThreadPool.singleton,
         logger: Logger = Logger(label: "FileMiddleware")
     ) where Provider == LocalFileSystem {
@@ -74,6 +81,7 @@ where Provider.FileAttributes: FileMiddlewareFileAttributes {
             urlBasePath: urlBasePath,
             cacheControl: cacheControl,
             searchForIndexHtml: searchForIndexHtml,
+            serveOnNotFoundResponse: serveOnNotFoundResponse,
             mediaTypeFileExtensionMap: [:]
         )
     }
@@ -84,17 +92,20 @@ where Provider.FileAttributes: FileMiddlewareFileAttributes {
     ///   - urlBasePath: Prefix to remove from request URL
     ///   - cacheControl: What cache control headers to include in response
     ///   - searchForIndexHtml: Should we look for index.html in folders
+    ///   - serveOnNotFoundResponse: Should we attempt to serve a file when a route returns a 404 response
     public init(
         fileProvider: Provider,
         urlBasePath: String? = nil,
         cacheControl: CacheControl = .init([]),
-        searchForIndexHtml: Bool = false
+        searchForIndexHtml: Bool = false,
+        serveOnNotFoundResponse: Bool = false
     ) {
         self.init(
             fileProvider: fileProvider,
             urlBasePath: urlBasePath,
             cacheControl: cacheControl,
             searchForIndexHtml: searchForIndexHtml,
+            serveOnNotFoundResponse: serveOnNotFoundResponse,
             mediaTypeFileExtensionMap: [:]
         )
     }
@@ -104,10 +115,12 @@ where Provider.FileAttributes: FileMiddlewareFileAttributes {
         urlBasePath: String? = nil,
         cacheControl: CacheControl = .init([]),
         searchForIndexHtml: Bool = false,
+        serveOnNotFoundResponse: Bool = false,
         mediaTypeFileExtensionMap: [MediaType.FileExtension: MediaType]
     ) {
         self.cacheControl = cacheControl
         self.searchForIndexHtml = searchForIndexHtml
+        self.serveOnNotFoundResponse = serveOnNotFoundResponse
         self.urlBasePath = urlBasePath.map { String($0.dropSuffix("/")) }
         self.fileProvider = fileProvider
         self.mediaTypeFileExtensionMap = mediaTypeFileExtensionMap
@@ -140,6 +153,7 @@ where Provider.FileAttributes: FileMiddlewareFileAttributes {
             urlBasePath: urlBasePath,
             cacheControl: cacheControl,
             searchForIndexHtml: searchForIndexHtml,
+            serveOnNotFoundResponse: serveOnNotFoundResponse,
             mediaTypeFileExtensionMap: extensions
         )
     }
@@ -147,77 +161,83 @@ where Provider.FileAttributes: FileMiddlewareFileAttributes {
     /// Handle request
     public func handle(_ request: Request, context: Context, next: (Request, Context) async throws -> Response) async throws -> Response {
         do {
-            return try await next(request, context)
+            let response = try await next(request, context)
+            if self.serveOnNotFoundResponse, response.status == .notFound {
+                return try await self.serveFile(for: request, context: context, fallbackError: HTTPError(.notFound))
+            }
+            return response
         } catch {
-            // Guard that error is HTTP error notFound
             guard let httpError = error as? any HTTPResponseError, httpError.status == .notFound else {
                 throw error
             }
+            return try await self.serveFile(for: request, context: context, fallbackError: error)
+        }
+    }
 
-            guard request.method == .get || request.method == .head else {
-                throw error
+    private func serveFile(for request: Request, context: Context, fallbackError: any Error) async throws -> Response {
+        guard request.method == .get || request.method == .head else {
+            throw fallbackError
+        }
+
+        // Remove percent encoding from URI path
+        guard var path = request.uri.path.removingURLPercentEncoding() else {
+            throw HTTPError(.badRequest, message: "Invalid percent encoding in URL")
+        }
+
+        // file paths that contain ".." are considered illegal
+        guard !path.contains("..") else {
+            throw HTTPError(.badRequest)
+        }
+
+        // Do we have a prefix to remove from the path
+        if let urlBasePath {
+            // If path doesnt have prefix then throw error
+            guard path.hasPrefix(urlBasePath) else {
+                throw fallbackError
             }
-
-            // Remove percent encoding from URI path
-            guard var path = request.uri.path.removingURLPercentEncoding() else {
-                throw HTTPError(.badRequest, message: "Invalid percent encoding in URL")
+            let subPath = path.dropFirst(urlBasePath.count)
+            if subPath.first == nil {
+                path = "/"
+            } else if subPath.first == "/" {
+                path = String(subPath)
+            } else {
+                // If first character isn't a "/" then the base path isn't a complete folder name
+                // in this situation, so isn't inside the specified folder
+                throw fallbackError
             }
+        }
+        // get file attributes and actual file path and ID (It might be an index.html)
+        let action = try await self.getFileAttributes(path)
+        switch action {
+        case .returnFile(let actualPath, let actualID, let attributes):
+            // we have a file so indicate it came from the FileMiddleware
+            context.coreContext.endpointPath.value = "FileMiddleware"
+            // get how we should respond
+            let fileResult = try await self.constructResponse(path: actualPath, attributes: attributes, request: request)
 
-            // file paths that contain ".." are considered illegal
-            guard !path.contains("..") else {
-                throw HTTPError(.badRequest)
-            }
-
-            // Do we have a prefix to remove from the path
-            if let urlBasePath {
-                // If path doesnt have prefix then throw error
-                guard path.hasPrefix(urlBasePath) else {
-                    throw error
-                }
-                let subPath = path.dropFirst(urlBasePath.count)
-                if subPath.first == nil {
-                    path = "/"
-                } else if subPath.first == "/" {
-                    path = String(subPath)
-                } else {
-                    // If first character isn't a "/" then the base path isn't a complete folder name
-                    // in this situation, so isn't inside the specified folder
-                    throw error
-                }
-            }
-            // get file attributes and actual file path and ID (It might be an index.html)
-            let action = try await self.getFileAttributes(path)
-            switch action {
-            case .returnFile(let actualPath, let actualID, let attributes):
-                // we have a file so indicate it came from the FileMiddleware
-                context.coreContext.endpointPath.value = "FileMiddleware"
-                // get how we should respond
-                let fileResult = try await self.constructResponse(path: actualPath, attributes: attributes, request: request)
-
-                switch fileResult {
-                case .notModified(let headers):
-                    return Response(status: .notModified, headers: headers)
-                case .loadFile(let headers, let range):
-                    switch request.method {
-                    case .get:
-                        if let range {
-                            let body = try await self.fileProvider.loadFile(id: actualID, range: range, context: context)
-                            return Response(status: .partialContent, headers: headers, body: body)
-                        }
-
-                        let body = try await self.fileProvider.loadFile(id: actualID, context: context)
-                        return Response(status: .ok, headers: headers, body: body)
-
-                    case .head:
-                        return Response(status: .ok, headers: headers, body: .init())
-
-                    default:
-                        throw error
+            switch fileResult {
+            case .notModified(let headers):
+                return Response(status: .notModified, headers: headers)
+            case .loadFile(let headers, let range):
+                switch request.method {
+                case .get:
+                    if let range {
+                        let body = try await self.fileProvider.loadFile(id: actualID, range: range, context: context)
+                        return Response(status: .partialContent, headers: headers, body: body)
                     }
+
+                    let body = try await self.fileProvider.loadFile(id: actualID, context: context)
+                    return Response(status: .ok, headers: headers, body: body)
+
+                case .head:
+                    return Response(status: .ok, headers: headers, body: .init())
+
+                default:
+                    throw fallbackError
                 }
-            case .redirect(let path):
-                return .redirect(to: path, type: .permanent)
             }
+        case .redirect(let path):
+            return .redirect(to: path, type: .permanent)
         }
     }
 }

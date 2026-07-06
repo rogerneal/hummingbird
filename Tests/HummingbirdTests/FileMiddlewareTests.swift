@@ -373,6 +373,120 @@ struct FileMiddlewareTests {
         }
     }
 
+    @Test func testOnReturnNotFoundResponse() async throws {
+        let router = Router()
+        router.middlewares.add(FileMiddleware(".", serveOnNotFoundResponse: true))
+        router.get("testOnReturnNotFoundResponse.html") { _, _ in
+            Response(status: .notFound)
+        }
+        let app = Application(responder: router.buildResponder())
+
+        let text = "Test file contents"
+        let data = Data(text.utf8)
+        let fileURL = URL(fileURLWithPath: "testOnReturnNotFoundResponse.html")
+        #expect(throws: Never.self) { try data.write(to: fileURL) }
+        defer { #expect(throws: Never.self) { try FileManager.default.removeItem(at: fileURL) } }
+
+        try await app.test(.router) { client in
+            try await client.execute(uri: "/testOnReturnNotFoundResponse.html", method: .get) { response in
+                #expect(String(buffer: response.body) == text)
+            }
+        }
+    }
+
+    @Test func testOnReturnNotFoundResponseDisabledByDefault() async throws {
+        let router = Router()
+        router.middlewares.add(FileMiddleware("."))
+        router.get("testOnReturnNotFoundResponseDisabledByDefault.html") { _, _ in
+            Response(status: .notFound)
+        }
+        let app = Application(responder: router.buildResponder())
+
+        let text = "Test file contents"
+        let data = Data(text.utf8)
+        let fileURL = URL(fileURLWithPath: "testOnReturnNotFoundResponseDisabledByDefault.html")
+        #expect(throws: Never.self) { try data.write(to: fileURL) }
+        defer { #expect(throws: Never.self) { try FileManager.default.removeItem(at: fileURL) } }
+
+        try await app.test(.router) { client in
+            try await client.execute(uri: "/testOnReturnNotFoundResponseDisabledByDefault.html", method: .get) { response in
+                #expect(response.status == .notFound)
+                #expect(response.body.readableBytes == 0)
+            }
+        }
+    }
+
+    @Test func testOnReturnNotFoundResponseHead() async throws {
+        let router = Router()
+        router.middlewares.add(FileMiddleware(".", serveOnNotFoundResponse: true))
+        router.get("testOnReturnNotFoundResponseHead.txt") { _, _ in
+            Response(status: .notFound)
+        }
+        let app = Application(responder: router.buildResponder())
+
+        let text = "Test file contents"
+        let data = Data(text.utf8)
+        let fileURL = URL(fileURLWithPath: "testOnReturnNotFoundResponseHead.txt")
+        #expect(throws: Never.self) { try data.write(to: fileURL) }
+        defer { #expect(throws: Never.self) { try FileManager.default.removeItem(at: fileURL) } }
+
+        try await app.test(.router) { client in
+            try await client.execute(uri: "/testOnReturnNotFoundResponseHead.txt", method: .head) { response in
+                #expect(response.status == .ok)
+                #expect(response.body.readableBytes == 0)
+                #expect(response.headers[.contentLength] == text.utf8.count.description)
+            }
+        }
+    }
+
+    @Test func testOnReturnNotFoundResponseWithURLBasePath() async throws {
+        struct MemoryFileProvider: FileProvider {
+            struct FileAttributes: FileMiddlewareFileAttributes {
+                var isFolder: Bool { false }
+                var modificationDate: Date { .distantPast }
+                let size: Int
+            }
+
+            func getFileIdentifier(_ path: String) -> String? { path }
+
+            func getAttributes(id path: String) async throws -> FileAttributes? {
+                .init(size: path.utf8.count)
+            }
+
+            func loadFile(id path: String, context: some RequestContext) async throws -> ResponseBody {
+                .init(byteBuffer: ByteBuffer(string: path))
+            }
+
+            func loadFile(id path: String, range: ClosedRange<Int>, context: some RequestContext) async throws -> ResponseBody {
+                let buffer = ByteBuffer(string: path)
+                guard let slice = buffer.getSlice(at: range.lowerBound, length: range.count) else {
+                    throw HTTPError(.rangeNotSatisfiable)
+                }
+                return .init(byteBuffer: slice)
+            }
+        }
+
+        let router = Router()
+        router.add(
+            middleware: FileMiddleware(
+                fileProvider: MemoryFileProvider(),
+                urlBasePath: "/static",
+                serveOnNotFoundResponse: true
+            )
+        )
+        router.get("static/:file") { _, _ in
+            Response(status: .notFound)
+        }
+        let app = Application(responder: router.buildResponder())
+
+        try await app.test(.router) { client in
+            try await client.execute(uri: "/static/hello.html", method: .get) { response in
+                #expect(response.status == .ok)
+                #expect(String(buffer: response.body) == "/hello.html")
+            }
+        }
+    }
+
     @Test func testOnThrowCustom404() async throws {
         let router = Router()
         router.middlewares.add(FileMiddleware(".", searchForIndexHtml: true))
