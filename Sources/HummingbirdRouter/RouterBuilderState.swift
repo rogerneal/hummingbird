@@ -11,7 +11,6 @@ import Hummingbird
 /// Router builder state used when building Router
 internal struct RouterBuilderState {
     @TaskLocal static var current: RouterBuilderState?
-    @TaskLocal static var requestOptions: RouterBuilderOptions?
     var routeGroupPath: RouterPath = ""
     let options: RouterBuilderOptions
 }

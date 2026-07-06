@@ -39,7 +39,7 @@ public struct RouterResponder<Context: RequestContext>: HTTPResponder {
     public func respond(to request: Request, context: Context) async throws -> Response {
         do {
             let path = request.uri.path
-            let resolved = _RouterTrieResolveOptions.$caseInsensitive.withValue(self.options.contains(.caseInsensitive)) {
+            let resolved = RouterTrieResolveOptions.$caseInsensitive.withValue(self.options.contains(.caseInsensitive)) {
                 trie.resolve(path)
             }
             guard

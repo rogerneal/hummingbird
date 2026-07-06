@@ -190,7 +190,7 @@ struct TrieRouterTests {
         let trieBuilder = RouterPathTrieBuilder<String>()
         trieBuilder.addEntry("recorded/{file}", value: "recorded")
         let trie = trieBuilder.build()
-        let resolved = _RouterTrieResolveOptions.$caseInsensitive.withValue(true) {
+        let resolved = RouterTrieResolveOptions.$caseInsensitive.withValue(true) {
             trie.resolve("/RECORDED/MyFile.mp4")
         }
         #expect(resolved?.value == "recorded")
@@ -209,7 +209,7 @@ struct TrieRouterTests {
         let trieBuilder = RouterPathTrieBuilder<String>()
         trieBuilder.addEntry("{file}.mp4", value: "video")
         let trie = trieBuilder.build()
-        let resolved = _RouterTrieResolveOptions.$caseInsensitive.withValue(true) {
+        let resolved = RouterTrieResolveOptions.$caseInsensitive.withValue(true) {
             trie.resolve("/MyFile.MP4")
         }
         #expect(resolved?.value == "video")
@@ -220,7 +220,7 @@ struct TrieRouterTests {
         let trieBuilder = RouterPathTrieBuilder<String>()
         trieBuilder.addEntry("file.{ext}", value: "file")
         let trie = trieBuilder.build()
-        let resolved = _RouterTrieResolveOptions.$caseInsensitive.withValue(true) {
+        let resolved = RouterTrieResolveOptions.$caseInsensitive.withValue(true) {
             trie.resolve("/File.JPG")
         }
         #expect(resolved?.value == "file")
@@ -231,7 +231,7 @@ struct TrieRouterTests {
         let trieBuilder = RouterPathTrieBuilder<String>()
         trieBuilder.addEntry("*.TXT", value: "prefixWildcard")
         let trie = trieBuilder.build()
-        let resolved = _RouterTrieResolveOptions.$caseInsensitive.withValue(true) {
+        let resolved = RouterTrieResolveOptions.$caseInsensitive.withValue(true) {
             trie.resolve("/file.txt")
         }
         #expect(resolved?.value == "prefixWildcard")

@@ -8,10 +8,6 @@
 
 import NIOCore
 
-enum _RouterTrieResolveOptions {
-    @TaskLocal static var caseInsensitive = false
-}
-
 extension RouterTrie {
     /// Resolve a path to a `Value` if available
     @inlinable
@@ -149,8 +145,8 @@ extension RouterTrie {
 
         @inlinable
         func equals(_ lhs: Substring, _ rhs: Substring) -> Bool {
-            if _RouterTrieResolveOptions.caseInsensitive {
-                lhs.caseInsensitiveCompare(rhs) == .orderedSame
+            if RouterTrieResolveOptions.caseInsensitive {
+                lhs.lowercased() == rhs.lowercased()
             } else {
                 lhs == rhs
             }
@@ -158,8 +154,8 @@ extension RouterTrie {
 
         @inlinable
         func hasSuffix(_ lhs: Substring, _ rhs: Substring) -> Bool {
-            if _RouterTrieResolveOptions.caseInsensitive {
-                lhs.suffix(rhs.count).caseInsensitiveCompare(rhs) == .orderedSame
+            if RouterTrieResolveOptions.caseInsensitive {
+                lhs.lowercased().hasSuffix(rhs.lowercased())
             } else {
                 lhs.hasSuffix(rhs)
             }
@@ -167,8 +163,8 @@ extension RouterTrie {
 
         @inlinable
         func hasPrefix(_ lhs: Substring, _ rhs: Substring) -> Bool {
-            if _RouterTrieResolveOptions.caseInsensitive {
-                lhs.prefix(rhs.count).caseInsensitiveCompare(rhs) == .orderedSame
+            if RouterTrieResolveOptions.caseInsensitive {
+                lhs.lowercased().hasPrefix(rhs.lowercased())
             } else {
                 lhs.hasPrefix(rhs)
             }
