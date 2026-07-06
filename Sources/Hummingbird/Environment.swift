@@ -63,28 +63,18 @@ public struct Environment: Sendable, Decodable, ExpressibleByDictionaryLiteral {
     let caseSensitiveKeys: Bool
 
     /// Initialize from environment variables
-    public init() {
-        self.caseSensitiveKeys = false
-        self.values = Self.getEnvironment(caseSensitiveKeys: false)
-    }
-
-    /// Initialize from environment variables with optional case-sensitive key lookup
     /// - Parameter caseSensitiveKeys: When `true`, preserve the case of environment variable names.
-    public init(caseSensitiveKeys: Bool) {
+    ///   Defaults to `false` (case insensitive lookup).
+    public init(caseSensitiveKeys: Bool = false) {
         self.caseSensitiveKeys = caseSensitiveKeys
         self.values = Self.getEnvironment(caseSensitiveKeys: caseSensitiveKeys)
     }
 
     /// Initialize from dictionary
-    public init(values: [String: String]) {
-        self.init(values: values, caseSensitiveKeys: false)
-    }
-
-    /// Initialize from dictionary with optional case-sensitive key lookup
     /// - Parameters:
     ///   - values: Environment variables to add
     ///   - caseSensitiveKeys: When `true`, preserve the case of keys in `values`.
-    public init(values: [String: String], caseSensitiveKeys: Bool) {
+    public init(values: [String: String], caseSensitiveKeys: Bool = false) {
         self.caseSensitiveKeys = caseSensitiveKeys
         self.values = Self.getEnvironment(caseSensitiveKeys: caseSensitiveKeys)
         for (key, value) in values {
@@ -150,7 +140,7 @@ public struct Environment: Sendable, Decodable, ExpressibleByDictionaryLiteral {
     /// Set environment variable
     ///
     /// This sets the variable within this type and also calls `setenv` so future versions
-    /// of this type will also have this variable set (using the exact key casing passed to `set`).
+    /// of this type will also have this variable set.
     ///
     /// - Warning: `setenv` and `unsetenv` are not thread-safe on Linux. Only call this during
     ///   application startup before concurrent tasks access the environment, unless you provide
@@ -178,10 +168,8 @@ public struct Environment: Sendable, Decodable, ExpressibleByDictionaryLiteral {
     /// Merge two environment variable sets together and return result
     ///
     /// If an environment variable exists in both sets it will choose the version from the second
-    /// set of environment variables.
-    ///
-    /// The merged environment uses case-sensitive keys if either input environment uses them.
-    /// - Parameter env: Environment variables to merge into this environment variable set
+    /// set of environment variables
+    /// - Parameter env: environemnt variables to merge into this environment variable set
     public func merging(with env: Environment) -> Environment {
         .init(
             rawValues: self.values.merging(env.values) { $1 },
@@ -200,21 +188,10 @@ public struct Environment: Sendable, Decodable, ExpressibleByDictionaryLiteral {
     }
 
     /// Create Environment initialised from the `.env` file
-    ///
-    /// If the file cannot be read, returns an environment containing the current process
-    /// environment variables (same as ``init()``).
-    public static func dotEnv(_ dotEnvPath: String = ".env") async throws -> Self {
-        try await dotEnv(dotEnvPath, caseSensitiveKeys: false)
-    }
-
-    /// Create Environment initialised from the `.env` file with optional case-sensitive keys
-    ///
-    /// If the file cannot be read, returns an environment containing the current process
-    /// environment variables (same as ``init(caseSensitiveKeys:)``).
     /// - Parameters:
     ///   - dotEnvPath: Path to the `.env` file
     ///   - caseSensitiveKeys: When `true`, preserve the case of keys from the file
-    public static func dotEnv(_ dotEnvPath: String, caseSensitiveKeys: Bool) async throws -> Self {
+    public static func dotEnv(_ dotEnvPath: String = ".env", caseSensitiveKeys: Bool = false) async throws -> Self {
         guard let dotEnv = await loadDotEnv(dotEnvPath) else {
             return .init(caseSensitiveKeys: caseSensitiveKeys)
         }
