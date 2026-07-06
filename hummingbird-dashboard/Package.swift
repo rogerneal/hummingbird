@@ -11,6 +11,7 @@ let package = Package(
         .library(name: "HummingbirdDashboard", targets: ["HummingbirdDashboard"]),
         .library(name: "HummingbirdDashboardWS", targets: ["HummingbirdDashboardWS"]),
         .executable(name: "DashboardExample", targets: ["DashboardExample"]),
+        .executable(name: "DashboardHashPassword", targets: ["DashboardHashPassword"]),
     ],
     dependencies: [
         // local hummingbird fork; replace with
@@ -21,6 +22,7 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-http-types.git", from: "1.0.0"),
         .package(url: "https://github.com/apple/swift-log.git", from: "1.5.0"),
         .package(url: "https://github.com/apple/swift-nio.git", from: "2.81.0"),
+        .package(url: "https://github.com/apple/swift-crypto.git", from: "3.0.0"),
     ],
     targets: [
         .target(
@@ -29,6 +31,8 @@ let package = Package(
                 .product(name: "Hummingbird", package: "hummingbird"),
                 .product(name: "NIOCore", package: "swift-nio"),
                 .product(name: "NIOConcurrencyHelpers", package: "swift-nio"),
+                .product(name: "Crypto", package: "swift-crypto"),
+                .product(name: "_CryptoExtras", package: "swift-crypto"),
             ]
         ),
         .target(
@@ -50,6 +54,12 @@ let package = Package(
                 .product(name: "Logging", package: "swift-log"),
                 .product(name: "NIOCore", package: "swift-nio"),
                 .product(name: "NIOEmbedded", package: "swift-nio"),
+            ]
+        ),
+        .executableTarget(
+            name: "DashboardHashPassword",
+            dependencies: [
+                .byName(name: "HummingbirdDashboard")
             ]
         ),
         .testTarget(

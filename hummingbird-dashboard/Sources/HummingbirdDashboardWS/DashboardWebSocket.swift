@@ -14,26 +14,27 @@ import HummingbirdWebSocket
 extension RouterMethods where Context: WebSocketRequestContext {
     /// Register a WebSocket endpoint that pushes JSON metric snapshots to connected clients.
     ///
-    /// Pair with ``DashboardConfiguration/liveSocketPath`` so the dashboard page knows
-    /// where to connect, or use ``addDashboardWithLiveUpdates()`` which wires both up.
-    ///
-    /// Requires the application server to be built with
-    /// ``HTTPServerBuilder/http1WebSocketUpgrade(webSocketRouter:)``.
-    ///
-    /// - Parameters:
-    ///   - path: WebSocket upgrade path
-    ///   - metrics: Metrics store to read snapshots from
-    ///   - refreshIntervalMS: How often to push a new snapshot, in milliseconds
+    /// When ``DashboardAuthState`` is provided, the WebSocket upgrade requires a valid admin session cookie.
     @discardableResult
     public func addDashboardWebSocket(
         path: String = "/dashboard/api/live",
         metrics: DashboardMetrics = .shared,
-        refreshIntervalMS: Int = 2000
+        refreshIntervalMS: Int = 2000,
+        authState: DashboardAuthState? = nil
     ) -> Self {
         let jsonEncoder = JSONEncoder()
-        self.ws(RouterPath(path)) { inbound, outbound, _ in
+        self.ws(
+            RouterPath(path),
+            shouldUpgrade: { request, _ in
+                if let authState {
+                    guard await authState.isAuthorized(request: request) else {
+                        throw HTTPError(.unauthorized)
+                    }
+                }
+                return .upgrade()
+            }
+        ) { inbound, outbound, _ in
             try await withThrowingTaskGroup(of: Void.self) { group in
-                // drain inbound until the client closes the connection
                 group.addTask {
                     do {
                         for try await _ in inbound {}
@@ -41,7 +42,6 @@ extension RouterMethods where Context: WebSocketRequestContext {
                         return
                     }
                 }
-                // push snapshots on a timer
                 group.addTask {
                     while !Task.isCancelled {
                         do {
@@ -62,20 +62,6 @@ extension RouterMethods where Context: WebSocketRequestContext {
     }
 
     /// Add the dashboard UI, JSON API, Prometheus endpoint, and a WebSocket live stream.
-    ///
-    /// The router must use a ``WebSocketRequestContext`` (eg `BasicWebSocketRequestContext`)
-    /// and the application server must use ``HTTPServerBuilder/http1WebSocketUpgrade(webSocketRouter:)``.
-    ///
-    /// ```swift
-    /// let router = Router(context: BasicWebSocketRequestContext.self)
-    /// router.addDashboardWithLiveUpdates()
-    /// router.add(middleware: DashboardMiddleware())
-    ///
-    /// let app = Application(
-    ///     router: router,
-    ///     server: .http1WebSocketUpgrade(webSocketRouter: router)
-    /// )
-    /// ```
     @discardableResult
     public func addDashboardWithLiveUpdates(
         configuration: DashboardConfiguration = .init(),
@@ -84,11 +70,12 @@ extension RouterMethods where Context: WebSocketRequestContext {
     ) -> Self {
         var config = configuration
         config.liveSocketPath = livePath
-        self.addDashboard(configuration: config, metrics: metrics)
+        let (_, authState) = self.addDashboard(configuration: config, metrics: metrics)
         self.addDashboardWebSocket(
             path: livePath,
             metrics: metrics,
-            refreshIntervalMS: config.refreshIntervalMS
+            refreshIntervalMS: config.refreshIntervalMS,
+            authState: authState
         )
         return self
     }

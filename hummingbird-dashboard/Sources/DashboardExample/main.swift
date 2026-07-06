@@ -25,8 +25,13 @@ let env = Environment()
 let hostname = env.get("SERVER_HOSTNAME") ?? "127.0.0.1"
 let port = env.get("SERVER_PORT", as: Int.self) ?? 8080
 
+var dashboardConfig = DashboardConfiguration(enableReset: true)
+if let auth = DashboardAuthConfiguration.fromEnvironment() {
+    dashboardConfig.auth = auth
+}
+
 let router = Router(context: BasicWebSocketRequestContext.self)
-router.addDashboardWithLiveUpdates(configuration: .init(enableReset: true))
+router.addDashboardWithLiveUpdates(configuration: dashboardConfig)
 router.add(middleware: DashboardMiddleware())
 
 router.get("/") { _, _ in

@@ -110,6 +110,9 @@ All paths are configurable via `DashboardConfiguration`.
 | Route | Description |
 |---|---|
 | `GET /dashboard` | Dashboard HTML page |
+| `GET /dashboard/login` | Admin login page (when auth enabled) |
+| `POST /dashboard/login` | Admin login form submission |
+| `POST /dashboard/logout` | End admin session |
 | `GET /dashboard/api/metrics` | Full metrics snapshot as JSON |
 | `GET /dashboard/api/health` | Lightweight health check |
 | `GET /dashboard/api/live` | WebSocket live metrics stream (`HummingbirdDashboardWS` only) |
@@ -124,9 +127,98 @@ router.addDashboard(configuration: .init(
     prometheusPath: "/metrics",      // set to nil to disable Prometheus
     enableReset: false,              // true adds POST /dashboard/api/reset + UI button
     refreshIntervalMS: 2000,         // poll / push interval for the UI
-    liveSocketPath: nil              // set automatically by addDashboardWithLiveUpdates()
+    liveSocketPath: nil,             // set automatically by addDashboardWithLiveUpdates()
+    auth: nil                        // set to enable admin login (see below)
 ))
 ```
+
+### Admin authentication
+
+By default, `auth` is **`nil`** — there is **no sign-in screen** and no built-in username or password. The dashboard, JSON API, `/metrics`, and WebSocket are open until you opt in.
+
+When you set `auth`, you configure **one admin account** before startup. There is no registration flow, user database, or shipped default credentials. Operators choose the username and password; only a **PBKDF2-SHA256 hash** of the password is stored (never plaintext).
+
+#### Initial password setup
+
+Do this once per environment (development, staging, production):
+
+1. **Choose a strong password** — use a password manager; avoid predictable values like `changeme` outside local dev.
+
+2. **Generate a hash** from the `hummingbird-dashboard` package directory:
+
+   ```sh
+   cd hummingbird-dashboard
+   swift run DashboardHashPassword 'your-strong-password'
+   ```
+
+   Output looks like:
+
+   ```text
+   pbkdf2-sha256:600000:<salt>:<digest>
+   ```
+
+   Copy the full line. This is what you store in config or secrets — **not** the plaintext password.
+
+   You can also generate a hash in code (e.g. a one-off script):
+
+   ```swift
+   let hash = try DashboardAuthConfiguration.hashPassword("your-strong-password")
+   print(hash)
+   ```
+
+3. **Configure the admin account** using either environment variables or Swift configuration.
+
+   **Environment (recommended for production and `DashboardExample`):**
+
+   | Variable | Required | Description |
+   |---|---|---|
+   | `DASHBOARD_ADMIN_USER` | Yes | Admin username (e.g. `admin`) |
+   | `DASHBOARD_ADMIN_PASSWORD_HASH` | Yes | Full hash line from step 2 |
+   | `DASHBOARD_SCRAPE_TOKEN` | No | Bearer token so Prometheus can scrape `/metrics` when auth is on |
+
+   ```sh
+   export DASHBOARD_ADMIN_USER=admin
+   export DASHBOARD_ADMIN_PASSWORD_HASH='pbkdf2-sha256:600000:...'
+   swift run DashboardExample
+   ```
+
+   `DashboardExample` enables auth only when **both** `DASHBOARD_ADMIN_USER` and `DASHBOARD_ADMIN_PASSWORD_HASH` are set.
+
+   **Swift configuration:**
+
+   ```swift
+   let passwordHash = try DashboardAuthConfiguration.hashPassword("your-strong-password")
+   router.addDashboard(configuration: .init(
+       auth: .init(username: "admin", passwordHash: passwordHash)
+   ))
+   ```
+
+   Or load from the environment in your app:
+
+   ```swift
+   router.addDashboard(configuration: .init(
+       auth: DashboardAuthConfiguration.fromEnvironment()
+   ))
+   ```
+
+4. **Sign in** — open `/dashboard`. You are redirected to `/dashboard/login`. Enter the username and **plaintext password** from step 1 (the hash is only for server storage). On success you receive an HttpOnly session cookie (default lifetime: 8 hours).
+
+#### What to store where
+
+| Store in secrets / env | Never commit to git |
+|---|---|
+| `DASHBOARD_ADMIN_USER` | Plaintext password |
+| `DASHBOARD_ADMIN_PASSWORD_HASH` | |
+| `DASHBOARD_SCRAPE_TOKEN` (optional) | |
+
+#### Production notes
+
+- Use **TLS** in production and set `secureCookies: true` on ``DashboardAuthConfiguration`` so session cookies are marked `Secure`.
+- Keep the dashboard on an internal network or behind a reverse proxy when possible.
+- To **rotate** a password: generate a new hash, update the secret, redeploy. There is no in-app password change UI yet.
+- Prometheus cannot use cookie login; set `DASHBOARD_SCRAPE_TOKEN` and configure scrape `authorization: credentials: <token>` when `/metrics` is protected.
+
+When auth is enabled, browsers use a session cookie after signing in at `/dashboard/login`. Prometheus can scrape `/metrics` with `Authorization: Bearer <DASHBOARD_SCRAPE_TOKEN>` when a scrape token is configured.
 
 Use a shared metrics instance when you need a custom store instead of `.shared`:
 
@@ -184,8 +276,10 @@ Covers metrics recording, route template grouping, Prometheus export, end-to-end
 
 ## Production use
 
-- Protect `/dashboard` with auth middleware or serve it on an internal-only interface — it exposes routes, error rates, and recent requests.
-- Leave `enableReset` disabled (the default) outside development; it registers an unauthenticated endpoint that clears all metrics.
+- Enable built-in admin auth via ``DashboardConfiguration/auth`` or bind to an internal interface only — the dashboard exposes routes, error rates, and recent requests.
+- Use TLS (or terminate TLS at a reverse proxy) when `secureCookies` is enabled so session cookies are marked `Secure`.
+- Set `DASHBOARD_SCRAPE_TOKEN` when Prometheus scrapes a protected `/metrics` endpoint.
+- Leave `enableReset` disabled (the default) outside development; it registers an endpoint that clears all metrics (CSRF-protected when auth is enabled).
 - Scrape `/metrics` with Prometheus for persistence and alerting across restarts and replicas.
 
 ## License

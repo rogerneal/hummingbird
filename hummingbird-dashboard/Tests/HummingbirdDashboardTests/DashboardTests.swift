@@ -217,4 +217,111 @@ struct DashboardTests {
         #expect(snapshot.totalRequests >= 1)
         #expect(snapshot.routes.contains { $0.path == "/seed" })
     }
+
+    @Test func testPasswordHasher() throws {
+        let hash = try DashboardAuthConfiguration.hashPassword("secret", iterations: 210_000)
+        #expect(DashboardAuthConfiguration.verifyPassword("secret", passwordHash: hash))
+        #expect(!DashboardAuthConfiguration.verifyPassword("wrong", passwordHash: hash))
+    }
+
+    @Test func testAuthBlocksUnauthenticatedAccess() async throws {
+        let router = Router()
+        router.addDashboard(configuration: .init(auth: try Self.testAuthConfig()))
+        let app = Application(router: router)
+        try await app.test(.router) { client in
+            try await client.execute(uri: "/dashboard/api/metrics", method: .get) { response in
+                #expect(response.status == .unauthorized)
+            }
+            try await client.execute(uri: "/dashboard", method: .get, headers: [.accept: "text/html"]) { response in
+                #expect(response.status == .found)
+                #expect(response.headers[.location]?.hasPrefix("/dashboard/login") == true)
+            }
+        }
+    }
+
+    @Test func testAuthLoginGrantsAccess() async throws {
+        let router = Router()
+        router.addDashboard(configuration: .init(auth: try Self.testAuthConfig()))
+        let app = Application(router: router)
+        try await app.test(.router) { client in
+            let loginHTML = try await client.execute(uri: "/dashboard/login", method: .get) { response in
+                #expect(response.status == .ok)
+                return String(buffer: response.body)
+            }
+            let csrf = try #require(Self.extractFormField(loginHTML, name: "csrf"))
+            let body = ByteBuffer(string: "csrf=\(csrf)&username=admin&password=secret")
+            let cookie = try await client.execute(
+                uri: "/dashboard/login",
+                method: .post,
+                headers: [.contentType: "application/x-www-form-urlencoded"],
+                body: body
+            ) { response in
+                #expect(response.status == .found)
+                return try #require(response.headers[.setCookie])
+            }
+            try await client.execute(
+                uri: "/dashboard/api/metrics",
+                method: .get,
+                headers: [.cookie: cookie]
+            ) { response in
+                #expect(response.status == .ok)
+            }
+        }
+    }
+
+    @Test func testAuthPrometheusBearerScrapeToken() async throws {
+        let router = Router()
+        router.addDashboard(configuration: .init(auth: try Self.testAuthConfig(scrapeToken: "scrape-secret")))
+        let app = Application(router: router)
+        try await app.test(.router) { client in
+            try await client.execute(uri: "/metrics", method: .get) { response in
+                #expect(response.status == .unauthorized)
+            }
+            try await client.execute(
+                uri: "/metrics",
+                method: .get,
+                headers: [.authorization: "Bearer scrape-secret"]
+            ) { response in
+                #expect(response.status == .ok)
+                #expect(String(buffer: response.body).contains("http_requests_total"))
+            }
+        }
+    }
+
+    @Test func testWebSocketRequiresAuthWhenEnabled() async throws {
+        let metrics = DashboardMetrics()
+        let router = Router(context: BasicWebSocketRequestContext.self)
+        let (_, authState) = router.addDashboard(
+            configuration: .init(auth: try Self.testAuthConfig()),
+            metrics: metrics
+        )
+        router.addDashboardWebSocket(metrics: metrics, refreshIntervalMS: 50, authState: authState)
+
+        let app = Application(
+            router: router,
+            server: .http1WebSocketUpgrade(webSocketRouter: router)
+        )
+
+        await #expect(throws: Error.self) {
+            try await app.test(.live) { client in
+                _ = try await client.ws("/dashboard/api/live") { _, _, _ in }
+            }
+        }
+    }
+
+    private static func testAuthConfig(scrapeToken: String? = nil) throws -> DashboardAuthConfiguration {
+        .init(
+            username: "admin",
+            passwordHash: try DashboardAuthConfiguration.hashPassword("secret", iterations: 210_000),
+            scrapeToken: scrapeToken
+        )
+    }
+
+    private static func extractFormField(_ html: String, name: String) -> String? {
+        let marker = "name=\"\(name)\" value=\""
+        guard let start = html.range(of: marker)?.upperBound,
+            let end = html[start...].firstIndex(of: "\"")
+        else { return nil }
+        return String(html[start..<end])
+    }
 }

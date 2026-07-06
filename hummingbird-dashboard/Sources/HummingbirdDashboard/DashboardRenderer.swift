@@ -19,20 +19,24 @@ struct DashboardRenderer: Sendable {
     let liveSocketPath: String?
     /// When set, the dashboard shows a reset button that POSTs to this path
     let resetAPIPath: String?
+    /// When set, unauthenticated users are redirected to this login path
+    let loginPath: String?
 
     init(
         metricsAPIPath: String,
         refreshIntervalMS: Int = 2000,
         liveSocketPath: String? = nil,
-        resetAPIPath: String? = nil
+        resetAPIPath: String? = nil,
+        loginPath: String? = nil
     ) {
         self.metricsAPIPath = metricsAPIPath
         self.refreshIntervalMS = refreshIntervalMS
         self.liveSocketPath = liveSocketPath
         self.resetAPIPath = resetAPIPath
+        self.loginPath = loginPath
     }
 
-    func html() -> String {
+    func html(csrfToken: String? = nil) -> String {
         """
         <!DOCTYPE html>
         <html lang="en">
@@ -118,6 +122,8 @@ struct DashboardRenderer: Sendable {
         const REFRESH_MS = \(self.refreshIntervalMS);
         const LIVE_WS_PATH = \(self.liveSocketPath.map { "\"\($0)\"" } ?? "null");
         const RESET_PATH = \(self.resetAPIPath.map { "\"\($0)\"" } ?? "null");
+        const LOGIN_PATH = \(self.loginPath.map { "\"\($0)\"" } ?? "null");
+        const CSRF_TOKEN = \(csrfToken.map { "\"\($0)\"" } ?? "null");
         \(Self.javascript)
         </script>
         </body>
@@ -366,7 +372,12 @@ struct DashboardRenderer: Sendable {
 
         async function poll() {
             try {
-                const response = await fetch(API_PATH, { cache: "no-store" });
+                const response = await fetch(API_PATH, { cache: "no-store", credentials: "same-origin" });
+                if (response.status === 401 && LOGIN_PATH) {
+                    const next = encodeURIComponent(location.pathname + location.search);
+                    location.href = LOGIN_PATH + "?next=" + next;
+                    return;
+                }
                 if (!response.ok) throw new Error("HTTP " + response.status);
                 update(await response.json());
                 setStatus(true, null);
@@ -418,7 +429,17 @@ struct DashboardRenderer: Sendable {
                 const btn = $("reset-btn");
                 btn.disabled = true;
                 try {
-                    const response = await fetch(RESET_PATH, { method: "POST" });
+                    const body = CSRF_TOKEN ? "csrf=" + encodeURIComponent(CSRF_TOKEN) : "";
+                    const response = await fetch(RESET_PATH, {
+                        method: "POST",
+                        credentials: "same-origin",
+                        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                        body: body
+                    });
+                    if (response.status === 401 && LOGIN_PATH) {
+                        location.href = LOGIN_PATH;
+                        return;
+                    }
                     if (!response.ok) throw new Error("HTTP " + response.status);
                     if (pollTimer !== null) await poll();
                 } catch (e) {
