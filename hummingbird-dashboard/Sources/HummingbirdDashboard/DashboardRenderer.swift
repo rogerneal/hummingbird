@@ -114,10 +114,10 @@ struct DashboardRenderer: Sendable {
             </section>
         </div>
         <script>
-        const API_PATH = "\(self.metricsAPIPath)";
+        const API_PATH = \(String(reflecting: self.metricsAPIPath));
         const REFRESH_MS = \(self.refreshIntervalMS);
-        const LIVE_WS_PATH = \(self.liveSocketPath.map { "\"\($0)\"" } ?? "null");
-        const RESET_PATH = \(self.resetAPIPath.map { "\"\($0)\"" } ?? "null");
+        const LIVE_WS_PATH = \(self.liveSocketPath.map { String(reflecting: $0) } ?? "null");
+        const RESET_PATH = \(self.resetAPIPath.map { String(reflecting: $0) } ?? "null");
         \(Self.javascript)
         </script>
         </body>
