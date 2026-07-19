@@ -32,7 +32,7 @@ extension RouterPath {
 
     private func pathComponentMatches(_ lhs: Substring, _ rhs: Substring, caseInsensitive: Bool) -> Bool {
         if caseInsensitive {
-            lhs.lowercased() == rhs.lowercased()
+            ASCIICaseInsensitive.equals(lhs, rhs)
         } else {
             lhs == rhs
         }
@@ -40,7 +40,7 @@ extension RouterPath {
 
     private func pathComponentHasSuffix(_ component: Substring, suffix: Substring, caseInsensitive: Bool) -> Bool {
         if caseInsensitive {
-            component.lowercased().hasSuffix(suffix.lowercased())
+            ASCIICaseInsensitive.hasSuffix(component, suffix)
         } else {
             component.hasSuffix(suffix)
         }
@@ -48,7 +48,7 @@ extension RouterPath {
 
     private func pathComponentHasPrefix(_ component: Substring, prefix: Substring, caseInsensitive: Bool) -> Bool {
         if caseInsensitive {
-            component.lowercased().hasPrefix(prefix.lowercased())
+            ASCIICaseInsensitive.hasPrefix(component, prefix)
         } else {
             component.hasPrefix(prefix)
         }

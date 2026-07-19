@@ -141,7 +141,7 @@ extension RouterTrie {
 
         func equals(_ lhs: Substring, _ rhs: Substring) -> Bool {
             if RouterTrieResolveOptions.caseInsensitive {
-                lhs.lowercased() == rhs.lowercased()
+                ASCIICaseInsensitive.equals(lhs, rhs)
             } else {
                 lhs == rhs
             }
@@ -149,7 +149,7 @@ extension RouterTrie {
 
         func hasSuffix(_ lhs: Substring, _ rhs: Substring) -> Bool {
             if RouterTrieResolveOptions.caseInsensitive {
-                lhs.lowercased().hasSuffix(rhs.lowercased())
+                ASCIICaseInsensitive.hasSuffix(lhs, rhs)
             } else {
                 lhs.hasSuffix(rhs)
             }
@@ -157,7 +157,7 @@ extension RouterTrie {
 
         func hasPrefix(_ lhs: Substring, _ rhs: Substring) -> Bool {
             if RouterTrieResolveOptions.caseInsensitive {
-                lhs.lowercased().hasPrefix(rhs.lowercased())
+                ASCIICaseInsensitive.hasPrefix(lhs, rhs)
             } else {
                 lhs.hasPrefix(rhs)
             }

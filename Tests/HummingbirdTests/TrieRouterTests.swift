@@ -236,4 +236,12 @@ struct TrieRouterTests {
         }
         #expect(resolved?.value == "prefixWildcard")
     }
+
+    @Test func testASCIICaseInsensitiveHelpers() {
+        #expect(ASCIICaseInsensitive.equals("RecordeD"[...], "recorded"[...]))
+        #expect(!ASCIICaseInsensitive.equals("record"[...], "recorded"[...]))
+        #expect(ASCIICaseInsensitive.hasSuffix("MyFile.MP4"[...], ".mp4"[...]))
+        #expect(ASCIICaseInsensitive.hasPrefix("File.JPG"[...], "file."[...]))
+        #expect(!ASCIICaseInsensitive.hasPrefix("ile.JPG"[...], "file."[...]))
+    }
 }
