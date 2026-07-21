@@ -185,4 +185,63 @@ struct TrieRouterTests {
         #expect(trie.resolve("this.txt")?.value == "prefixWildcard")
         #expect(trie.resolve("hello")?.value == "parameter")
     }
+
+    @Test func testCaseInsensitivePreservesParameterCase() {
+        let trieBuilder = RouterPathTrieBuilder<String>()
+        trieBuilder.addEntry("recorded/{file}", value: "recorded")
+        let trie = trieBuilder.build()
+        let resolved = RouterTrieResolveOptions.$caseInsensitive.withValue(true) {
+            trie.resolve("/RECORDED/MyFile.mp4")
+        }
+        #expect(resolved?.value == "recorded")
+        #expect(resolved?.parameters.get("file") == "MyFile.mp4")
+    }
+
+    @Test func testCaseSensitiveDoesNotMatchMixedCasePath() {
+        let trieBuilder = RouterPathTrieBuilder<String>()
+        trieBuilder.addEntry("recorded/{file}", value: "recorded")
+        let trie = trieBuilder.build()
+        #expect(trie.resolve("/RECORDED/MyFile.mp4") == nil)
+        #expect(trie.resolve("/recorded/MyFile.mp4")?.parameters.get("file") == "MyFile.mp4")
+    }
+
+    @Test func testCaseInsensitivePreservesPrefixCaptureParameterCase() {
+        let trieBuilder = RouterPathTrieBuilder<String>()
+        trieBuilder.addEntry("{file}.mp4", value: "video")
+        let trie = trieBuilder.build()
+        let resolved = RouterTrieResolveOptions.$caseInsensitive.withValue(true) {
+            trie.resolve("/MyFile.MP4")
+        }
+        #expect(resolved?.value == "video")
+        #expect(resolved?.parameters.get("file") == "MyFile")
+    }
+
+    @Test func testCaseInsensitivePreservesSuffixCaptureParameterCase() {
+        let trieBuilder = RouterPathTrieBuilder<String>()
+        trieBuilder.addEntry("file.{ext}", value: "file")
+        let trie = trieBuilder.build()
+        let resolved = RouterTrieResolveOptions.$caseInsensitive.withValue(true) {
+            trie.resolve("/File.JPG")
+        }
+        #expect(resolved?.value == "file")
+        #expect(resolved?.parameters.get("ext") == "JPG")
+    }
+
+    @Test func testCaseInsensitivePrefixWildcardUppercaseSuffix() {
+        let trieBuilder = RouterPathTrieBuilder<String>()
+        trieBuilder.addEntry("*.TXT", value: "prefixWildcard")
+        let trie = trieBuilder.build()
+        let resolved = RouterTrieResolveOptions.$caseInsensitive.withValue(true) {
+            trie.resolve("/file.txt")
+        }
+        #expect(resolved?.value == "prefixWildcard")
+    }
+
+    @Test func testASCIICaseInsensitiveHelpers() {
+        #expect(ASCIICaseInsensitive.equals("RecordeD"[...], "recorded"[...]))
+        #expect(!ASCIICaseInsensitive.equals("record"[...], "recorded"[...]))
+        #expect(ASCIICaseInsensitive.hasSuffix("MyFile.MP4"[...], ".mp4"[...]))
+        #expect(ASCIICaseInsensitive.hasPrefix("File.JPG"[...], "file."[...]))
+        #expect(!ASCIICaseInsensitive.hasPrefix("ile.JPG"[...], "file."[...]))
+    }
 }

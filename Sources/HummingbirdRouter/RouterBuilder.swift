@@ -53,12 +53,11 @@ where Handler.Input == Request, Handler.Output == Response, Handler.Context == C
     /// - Returns: HTTP Response
     public func handle(_ input: Input, context: Context, next: (Input, Context) async throws -> Output) async throws -> Output {
         var context = context
-        var path = input.uri.path
-        if self.options.contains(.caseInsensitive) {
-            path = path.lowercased()
-        }
+        let path = input.uri.path
         context.routerContext.remainingPathComponents = path.split(separator: "/")[...]
-        return try await self.handler.handle(input, context: context, next: next)
+        return try await RouterBuilderState.$requestOptions.withValue(self.options) {
+            try await self.handler.handle(input, context: context, next: next)
+        }
     }
 }
 

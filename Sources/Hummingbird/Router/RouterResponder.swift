@@ -35,17 +35,14 @@ public struct RouterResponder<Context: RequestContext>: HTTPResponder {
     ///   - request: HTTP request
     ///   - context: Request context
     /// - Returns: Response
-    @inlinable
     public func respond(to request: Request, context: Context) async throws -> Response {
         do {
-            let path: String
-            if self.options.contains(.caseInsensitive) {
-                path = request.uri.path.lowercased()
-            } else {
-                path = request.uri.path
+            let path = request.uri.path
+            let resolved = RouterTrieResolveOptions.$caseInsensitive.withValue(self.options.contains(.caseInsensitive)) {
+                trie.resolve(path)
             }
             guard
-                let (responderChain, parameters) = trie.resolve(path),
+                let (responderChain, parameters) = resolved,
                 let responder = responderChain.getResponder(for: request.method)
             else {
                 return try await self.notFoundResponder.respond(to: request, context: context)
