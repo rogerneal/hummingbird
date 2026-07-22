@@ -6,6 +6,12 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
+#if canImport(FoundationEssentials)
+internal import FoundationEssentials
+#else
+internal import Foundation
+#endif
+
 /// Split router path into components
 public struct RouterPath: Sendable, ExpressibleByStringLiteral, ExpressibleByStringInterpolation, CustomStringConvertible, Equatable {
     public struct Element: Equatable, Sendable, CustomStringConvertible {
