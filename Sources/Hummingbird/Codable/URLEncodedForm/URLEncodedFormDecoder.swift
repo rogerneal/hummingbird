@@ -707,3 +707,21 @@ private struct URLEncodedFormDecodingStorage {
     /// pop a container from the storage
     @discardableResult mutating func popContainer() -> URLEncodedFormNode { self.containers.removeLast() }
 }
+
+@available(hummingbird 2.0, *)
+extension URLEncodedFormDecoder.DateDecodingStrategy {
+    /// Decode the `Date` as a string parsed by the given strategy.
+    public static func parseStrategy<S: ParseStrategy & Sendable>(_ strategy: S) -> Self where S.ParseInput == String, S.ParseOutput == Date {
+        .custom { decoder in
+            let container = try decoder.singleValueContainer()
+            let value = try container.decode(String.self)
+            do {
+                return try strategy.parse(value)
+            } catch {
+                throw DecodingError.dataCorrupted(
+                    .init(codingPath: decoder.codingPath, debugDescription: "Invalid date format", underlyingError: error)
+                )
+            }
+        }
+    }
+}

@@ -225,6 +225,19 @@ extension URLEncodedFormTests {
             dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'"
             dateFormatter.timeZone = TimeZone(secondsFromGMT: 0)
             self.testForm(test, query: "d=2001-01-28T15%3A14%3A03.000Z", decoder: .init(dateDecodingStrategy: .formatted(dateFormatter)))
+            self.testForm(test, query: "d=2001-01-28T15%3A14%3A03Z", decoder: .init(dateDecodingStrategy: .parseStrategy(.iso8601)))
+        }
+
+        @Test func testDateFormatStyleRoundTrip() throws {
+            struct Test: Codable, Equatable {
+                let d: Date
+            }
+            let expected = Test(d: Date(timeIntervalSinceReferenceDate: 2_387_643))
+            let encoder = URLEncodedFormEncoder(dateEncodingStrategy: .formatStyle(.iso8601))
+            let decoder = URLEncodedFormDecoder(dateDecodingStrategy: .parseStrategy(.iso8601))
+            let encoded = try encoder.encode(expected)
+            let decoded = try decoder.decode(Test.self, from: encoded)
+            #expect(decoded == expected)
         }
 
         @Test func testDataBlobDecode() {

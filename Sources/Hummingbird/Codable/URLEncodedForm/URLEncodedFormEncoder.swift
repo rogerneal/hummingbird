@@ -392,3 +392,14 @@ private struct URLEncodedFormEncoderStorage {
         self.containers.removeLast()
     }
 }
+
+@available(hummingbird 2.0, *)
+extension URLEncodedFormEncoder.DateEncodingStrategy {
+    /// Encode the `Date` as a string formatted by the given style.
+    public static func formatStyle<S: FormatStyle & Sendable>(_ style: S) -> Self where S.FormatInput == Date, S.FormatOutput == String {
+        .custom { date, encoder in
+            var container = encoder.singleValueContainer()
+            try container.encode(date.formatted(style))
+        }
+    }
+}
