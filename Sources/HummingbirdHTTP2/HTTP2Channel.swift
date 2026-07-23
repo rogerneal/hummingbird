@@ -40,6 +40,7 @@ public struct HTTP2ChannelConfiguration: Sendable {
     ) {
         self.idleTimeout = idleTimeout
         self.gracefulCloseTimeout = gracefulCloseTimeout
+        self.maxAgeTimeout = maxAgeTimeout
         self.streamConfiguration = streamConfiguration
     }
 }
@@ -76,20 +77,31 @@ public struct HTTP2Channel: ServerChildChannel {
     /// - Returns: Object to process input/output on child channel
     public func setup(channel: any Channel, logger: Logger) -> EventLoopFuture<Value> {
         channel.eventLoop.makeCompletedFuture {
-            let connectionManager = HTTP2ServerConnectionManager(
+            let connectionManager = NIOHTTP2ServerConnectionManagementHandler(
                 eventLoop: channel.eventLoop,
-                idleTimeout: self.configuration.idleTimeout,
-                maxAgeTimeout: self.configuration.maxAgeTimeout,
-                gracefulCloseTimeout: self.configuration.gracefulCloseTimeout
+                configuration: .init(
+                    maxIdleTime: self.configuration.idleTimeout.map { TimeAmount($0) },
+                    maxAge: self.configuration.maxAgeTimeout.map { TimeAmount($0) },
+                    maxGraceTime: self.configuration.gracefulCloseTimeout.map { TimeAmount($0) },
+                    keepalive: nil
+                )
             )
             let handler: HTTP2Connection = try channel.pipeline.syncOperations.configureAsyncHTTP2Pipeline(
                 mode: .server,
-                streamDelegate: connectionManager.streamDelegate,
+                streamDelegate: connectionManager.http2StreamDelegate,
                 configuration: .init()
             ) { http2ChildChannel in
                 self.http2Stream.setup(channel: http2ChildChannel, logger: logger)
             }
             try channel.pipeline.syncOperations.addHandler(connectionManager)
+            try channel.pipeline.syncOperations.addHandler(HTTP2ConnectionEventsHandler())
+            // When HTTP2 is negotiated via ALPN this initializer runs after the channel has
+            // become active, so the connection manager misses `channelActive` and would never
+            // arm its max-idle and max-age timers. Deliver the missed event directly to it.
+            if channel.isActive {
+                let context = try channel.pipeline.syncOperations.context(handler: connectionManager)
+                connectionManager.channelActive(context: context)
+            }
             return .init(http2Connection: handler, channel: channel)
         }
     }

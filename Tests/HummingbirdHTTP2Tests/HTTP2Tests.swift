@@ -15,6 +15,7 @@ import Logging
 import NIOConcurrencyHelpers
 import NIOCore
 import NIOHTTP1
+import NIOHTTP2
 import NIOHTTPTypes
 import NIOPosix
 import NIOSSL
@@ -238,6 +239,50 @@ struct HummingBirdHTTP2Tests {
                 #expect(response.status == .ok)
             }
         )
+    }
+
+    @Test func testIdleTimeoutClosesConnection() async throws {
+        let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 2)
+        defer {
+            #expect(throws: Never.self) { try eventLoopGroup.syncShutdownGracefully() }
+        }
+        var logger = Logger(label: "Hummingbird")
+        logger.logLevel = .trace
+
+        try await testServer(
+            responder: { (_, responseWriter: consuming ResponseWriter, _) in
+                try await responseWriter.writeResponse(.init(status: .ok))
+            },
+            httpChannelSetup: .http2Upgrade(
+                tlsConfiguration: getServerTLSConfiguration(),
+                configuration: .init(idleTimeout: .milliseconds(250))
+            ),
+            configuration: .init(address: .hostname(port: 0), serverName: testServerName),
+            eventLoopGroup: eventLoopGroup,
+            logger: logger
+        ) { port in
+            var tlsConfiguration = try getClientTLSConfiguration()
+            tlsConfiguration.applicationProtocols = ["h2"]
+            let sslContext = try NIOSSLContext(configuration: tlsConfiguration)
+            // HTTP2 client that opens no streams. The server should close the connection
+            // once the idle timeout has passed
+            let channel = try await ClientBootstrap(group: eventLoopGroup)
+                .channelInitializer { channel in
+                    channel.eventLoop.makeCompletedFuture {
+                        try channel.pipeline.syncOperations.addHandler(
+                            NIOSSLClientHandler(context: sslContext, serverHostname: testServerName)
+                        )
+                        _ = try channel.pipeline.syncOperations.configureAsyncHTTP2Pipeline(mode: .client) { inboundStream in
+                            inboundStream.eventLoop.makeCompletedFuture {}
+                        }
+                    }
+                }
+                .connect(host: "localhost", port: port)
+                .get()
+            try await withTimeout(.seconds(10)) {
+                try await channel.closeFuture.get()
+            }
+        }
     }
 
     func testChildChannelGracefulShutdown() async throws {
