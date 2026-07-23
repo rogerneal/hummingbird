@@ -4,6 +4,7 @@ on:
   push:
     branches:
     - main
+    - claude/ticket-798-review-zwk8t8
     paths:
     - '**.swift'
     - '**.yml'
