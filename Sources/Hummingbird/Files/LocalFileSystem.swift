@@ -59,9 +59,9 @@ public struct LocalFileSystem: FileProvider {
         if rootFolder.first == "/" {
             workingFolder = ""
         } else {
-            if let cwd = getcwd(nil, Int(PATH_MAX)) {
-                workingFolder = String(cString: cwd) + "/"
-                free(cwd)
+            if let cwd = unsafe getcwd(nil, Int(PATH_MAX)) {
+                workingFolder = unsafe String(cString: cwd) + "/"
+                unsafe free(cwd)
             } else {
                 workingFolder = "./"
             }

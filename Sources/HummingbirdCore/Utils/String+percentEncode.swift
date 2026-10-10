@@ -63,7 +63,7 @@ extension StringProtocol {
 
     package func addingPercentEncoding(forURLComponent component: URLComponentSet) -> String {
         let fastResult = utf8.withContiguousStorageIfAvailable {
-            Self.addingPercentEncoding(utf8Buffer: $0, component: component)
+            unsafe Self.addingPercentEncoding(utf8Buffer: $0, component: component)
         }
         if let fastResult {
             return fastResult
@@ -75,21 +75,27 @@ extension StringProtocol {
     fileprivate static func addingPercentEncoding(utf8Buffer: some Collection<UInt8>, component: URLComponentSet) -> String {
         let maxLength = utf8Buffer.count * 3
         let percent = UInt8(ascii: "%")
-        let result = withUnsafeTemporaryAllocation(of: UInt8.self, capacity: maxLength) { buffer in
+        func encode(into buffer: UnsafeMutableBufferPointer<UInt8>) -> String {
             var i = 0
             for byte in utf8Buffer {
                 if byte.isAllowedIn(component) {
-                    buffer[i] = byte
+                    unsafe buffer[i] = byte
                     i += 1
                 } else {
-                    buffer[i] = percent
-                    buffer[i + 1] = hexToAscii(byte >> 4)
-                    buffer[i + 2] = hexToAscii(byte & 0xF)
+                    unsafe buffer[i] = percent
+                    unsafe buffer[i + 1] = hexToAscii(byte >> 4)
+                    unsafe buffer[i + 2] = hexToAscii(byte & 0xF)
                     i += 3
                 }
             }
-            return String(decoding: buffer[..<i], as: UTF8.self)
+            return unsafe String(decoding: buffer[..<i], as: UTF8.self)
         }
+        // Swift 6.2/6.3 treat the closure argument as unsafe. Swift 6.4 does not, and warns if it is marked.
+        #if compiler(>=6.4)
+        let result = withUnsafeTemporaryAllocation(of: UInt8.self, capacity: maxLength, encode(into:))
+        #else
+        let result = unsafe withUnsafeTemporaryAllocation(of: UInt8.self, capacity: maxLength, encode(into:))
+        #endif
         return result
     }
 
@@ -134,7 +140,7 @@ extension StringProtocol {
 
     package func removingURLPercentEncoding(excluding: Set<UInt8> = []) -> String? {
         let fastResult = utf8.withContiguousStorageIfAvailable {
-            Self.removingURLPercentEncoding(utf8Buffer: $0, excluding: excluding)
+            unsafe Self.removingURLPercentEncoding(utf8Buffer: $0, excluding: excluding)
         }
         if let fastResult {
             return fastResult
@@ -144,7 +150,7 @@ extension StringProtocol {
     }
 
     package static func removingURLPercentEncoding(utf8Buffer: some Collection<UInt8>, excluding: Set<UInt8> = []) -> String? {
-        let result: String? = withUnsafeTemporaryAllocation(of: UInt8.self, capacity: utf8Buffer.count) { buffer -> String? in
+        func decode(into buffer: UnsafeMutableBufferPointer<UInt8>) -> String? {
             var i = 0
             var byte: UInt8 = 0
             var hexDigitsRequired = 0
@@ -164,24 +170,30 @@ extension StringProtocol {
                         byte += hex
                         if excluding.contains(byte) {
                             // Keep the original percent-encoding for this byte
-                            i = buffer[i...i + 2].initialize(fromContentsOf: [UInt8(ascii: "%"), hexToAscii(byte >> 4), v])
+                            i = unsafe buffer[i...i + 2].initialize(fromContentsOf: [UInt8(ascii: "%"), hexToAscii(byte >> 4), v])
                         } else {
-                            buffer[i] = byte
+                            unsafe buffer[i] = byte
                             i += 1
                             byte = 0
                         }
                     }
                     hexDigitsRequired -= 1
                 } else {
-                    buffer[i] = v
+                    unsafe buffer[i] = v
                     i += 1
                 }
             }
             guard hexDigitsRequired == 0 else {
                 return nil
             }
-            return String(decoding: buffer[..<i], as: UTF8.self)
+            return unsafe String(decoding: buffer[..<i], as: UTF8.self)
         }
+        // Swift 6.2/6.3 treat the closure argument as unsafe. Swift 6.4 does not, and warns if it is marked.
+        #if compiler(>=6.4)
+        let result = withUnsafeTemporaryAllocation(of: UInt8.self, capacity: utf8Buffer.count, decode(into:))
+        #else
+        let result = unsafe withUnsafeTemporaryAllocation(of: UInt8.self, capacity: utf8Buffer.count, decode(into:))
+        #endif
         return result
     }
 }

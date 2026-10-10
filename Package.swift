@@ -24,6 +24,9 @@ swiftSettings.append(contentsOf: [
 ])
 #endif
 
+// https://github.com/swiftlang/swift-evolution/blob/main/proposals/0458-strict-memory-safety.md
+swiftSettings.append(.strictMemorySafety())
+
 let package = Package(
     name: "hummingbird",
     platforms: [.macOS(.v11), .iOS(.v15), .macCatalyst(.v15), .tvOS(.v15), .visionOS(.v1)],
